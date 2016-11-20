@@ -1,6 +1,6 @@
 <#
     .Synopsis
-        This script will create and configure a P drive for the specified user
+        This script checks for changes in group membership for a specified OU.
     .Description
         Script takes an Active Directory OU and returns a list of all groups within that OU and the members of those groups. 
 		Then compares the two files and if changes, returns what changed. uses md5deep64.exe to hash files.
