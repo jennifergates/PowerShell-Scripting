@@ -1,0 +1,10 @@
+"type C:\Windows\system32\drivers\etc\hosts"
+"net share"
+"arp -a"
+"net start"
+"dir C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup"
+"reg query HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run"
+"reg query HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Run"
+"net localgroup administrators"
+"schtasks"
+
