@@ -1,9 +1,9 @@
 <#
     .Synopsis
-        This script checks for changes in group membership for a specified OU.
+        This script will create and configure a P drive for the specified user
     .Description
         Script takes an Active Directory OU and returns a list of all groups within that OU and the members of those groups. 
-		Then compares the two files and if changes, returns what changed. uses md5deep64.exe to hash files.
+		Then compares the two files and if changes, returns what changed.
     .Example
         ./Get-AllGroupsMembers.ps1
     .Example
@@ -24,7 +24,7 @@
         VERSION: 1.00
         LASTEDIT: 19 NOV 2016
         CHANGELOG:
-            1.00 - initial script - still need to fix comparison side indicator replacement (added/delete)
+            1.00 - initial script
     
         Output Colors:
         White - Input Required
@@ -39,11 +39,11 @@
 Param(
     [string] $ou = "Security_Groups",
 
-	[string] $domain = "Company.domain.com",
+	[string] $domain = "3-29bct.ds.army.mil",
 	
-	[string] $baseline = "Company_baseline.txt",
+	[string] $baseline = "3-29bct_baseline.txt",
 	
-	[string] $filename = "Company_Security_Groups"
+	[string] $filename = "3-29bct_Security_Groups"
 )
 
 
@@ -54,12 +54,14 @@ $OUName = $ou
 $OUObject = get-ADorganizationalUnit -server $domain -Filter 'Name -like $OUName' #| Format-list -property DistinguishedName
 $DateFormatted = Get-date -uformat "%Y%m%d-%H%M"
 $OutputFile = $filename + $DateFormatted + '.txt'
+$getallgroupmembers_log = "get-allgroupmembers.txt"
 
 " "
 " "
-write-host "Getting groups in OU "  $OUObject.DistinguishedName 
-write-host "Please wait for file " $outputfile  "to be created." -foregroundcolor Yellow
+write-host "Getting groups and users in OU "  $OUObject.DistinguishedName 
+write-host "Log file:" $getallgroupmembers_log -foregroundcolor Yellow
 " "
+
 
 
 # Gets all the groups in the OU and sorts them alphabetically
@@ -105,7 +107,7 @@ if (test-path $baseline)
 	$now = Invoke-Expression '.\md5deep64.exe $outputfile'
 	if ((compare-object $base $now).count -gt 0)
 	{
-	
+		"Get-AllGroupsMembers ran at $DateFormatted. Changes detected. See file 1SECURITY_GROUP_MODIFICATION.txt" | out-file $getallgroupmembers_log -append
 		$a = Get-Content $baseline
         $b = Get-Content $outputfile
 		$results = compare-object  $a $b -passthru
@@ -113,20 +115,29 @@ if (test-path $baseline)
 		{
 			if ($result.sideindicator -eq "<=")
 			{
-				"User ADDED to group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
+				"User ADDED to group "+ $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
 			} 
-			else
+			if ($result.sideindicator -eq "=>")
 			{
-				"User ADDED from group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
+				"User DELETED from group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
 			}
+			
 		}
+	}	
+	else 
+	{
+		"Get-AllGroupsMembers ran at $DateFormatted. No changes." | out-file $getallgroupmembers_log -append
 	}
 	
 } 
 else 
 {
-	rename-item -path $outputfile -newname "Company_baseline.txt"
+	rename-item -path $outputfile -newname "3-29bct_baseline.txt"
 }
-	
+
+if (test-path $OutputFile)
+{
+	remove-item -path $outputfile
+}
 	
 	
