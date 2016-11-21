@@ -133,6 +133,7 @@ if (test-path $baseline)
 } 
 else 
 {
+	"Get-AllGroupsMembers ran at $DateFormatted. New baseline created." | out-file $getallgroupmembers_log -append
 	rename-item -path $outputfile -newname "3-29bct_baseline.txt"
 }
 
