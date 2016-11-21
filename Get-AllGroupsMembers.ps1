@@ -106,7 +106,11 @@ if (test-path $baseline)
 {
 	$base = Invoke-Expression '.\md5deep64.exe $baseline'
 	$now = Invoke-Expression '.\md5deep64.exe $outputfile'
-	if ((compare-object $base $now).count -gt 0)
+	
+	#write-host $base
+	#write-host $now
+	#write-host (compare-object $base.split(' ')[0] $now.split(' ')[0])
+	if ((compare-object $base.split(' ')[0] $now.split(' ')[0]).count -gt 0)
 	{
 		"Get-AllGroupsMembers ran at $DateFormatted. Changes detected. See file 1SECURITY_GROUP_MODIFICATION.txt" | out-file $getallgroupmembers_log -append
 		$a = Get-Content $baseline
@@ -133,8 +137,8 @@ if (test-path $baseline)
 } 
 else 
 {
-	"Get-AllGroupsMembers ran at $DateFormatted. New baseline created." | out-file $getallgroupmembers_log -append
 	rename-item -path $outputfile -newname "3-29bct_baseline.txt"
+	"Get-AllGroupsMembers ran at $DateFormatted. New baseline created." | out-file $getallgroupmembers_log -append
 }
 
 if (test-path $OutputFile)
