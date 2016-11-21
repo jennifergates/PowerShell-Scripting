@@ -113,11 +113,11 @@ if (test-path $baseline)
 		{
 			if ($result.sideindicator -eq "<=")
 			{
-				"User DELETED to group $result.tostring()" | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
+				"User ADDED to group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
 			} 
 			else
 			{
-				"User ADDED from group $result.tostring()" | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
+				"User ADDED from group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
 			}
 		}
 	}
