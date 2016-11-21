@@ -25,6 +25,7 @@
         LASTEDIT: 19 NOV 2016
         CHANGELOG:
             1.00 - initial script
+			1.10 - added log file to log when it runs
     
         Output Colors:
         White - Input Required
@@ -54,7 +55,7 @@ $OUName = $ou
 $OUObject = get-ADorganizationalUnit -server $domain -Filter 'Name -like $OUName' #| Format-list -property DistinguishedName
 $DateFormatted = Get-date -uformat "%Y%m%d-%H%M"
 $OutputFile = $filename + $DateFormatted + '.txt'
-$getallgroupmembers_log = "get-allgroupmembers.txt"
+$getallgroupmembers_log = "get-allgroupmembers.log"
 
 " "
 " "
@@ -115,11 +116,11 @@ if (test-path $baseline)
 		{
 			if ($result.sideindicator -eq "<=")
 			{
-				"User ADDED to group "+ $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
+				"$dateformatted : User ADDED to group "+ $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
 			} 
 			if ($result.sideindicator -eq "=>")
 			{
-				"User DELETED from group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
+				"$dateformatted : User DELETED from group " + $result.tostring() | out-file 1SECURITY_GROUP_MODIFICATION.txt -append
 			}
 			
 		}
