@@ -1,9 +1,9 @@
 <#
     .Synopsis
-        This script will create and configure a P drive for the specified user
+        This script baselines and compares to baseline the list of all groups within an OU and their members.
     .Description
         Script takes an Active Directory OU and returns a list of all groups within that OU and the members of those groups. 
-		Then compares the two files and if changes, returns what changed.
+		Then compares the two files and if changes, returns what changed. Uses md5eep64.exe
     .Example
         ./Get-AllGroupsMembers.ps1
     .Example
@@ -12,11 +12,11 @@
         ./Get-AllGroupsMembers.ps1 -ou Security-Groups
     .Parameter domain
         AD domain to connect to
-	.Parameter OU
+    .Parameter OU
         OU that contains the groups
-	.Parameter filename
+    .Parameter filename
         string to use as output file name
-	.Parameter baseline
+    .Parameter baseline
         name of baseline file to compare
     .Notes
         NAME: ./Get-AllGroupsMembers.ps1
@@ -40,11 +40,11 @@
 Param(
     [string] $ou = "Security_Groups",
 
-	[string] $domain = "3-29bct.ds.army.mil",
+	[string] $domain = "mycompany.net",
 	
-	[string] $baseline = "3-29bct_baseline.txt",
+	[string] $baseline = "mycompany_baseline.txt",
 	
-	[string] $filename = "3-29bct_Security_Groups"
+	[string] $filename = "mycompany_Security_Groups"
 )
 
 
@@ -137,7 +137,7 @@ if (test-path $baseline)
 } 
 else 
 {
-	rename-item -path $outputfile -newname "3-29bct_baseline.txt"
+	rename-item -path $outputfile -newname "mycompany_baseline.txt"
 	"Get-AllGroupsMembers ran at $DateFormatted. New baseline created." | out-file $getallgroupmembers_log -append
 }
 
