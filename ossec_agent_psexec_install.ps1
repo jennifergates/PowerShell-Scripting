@@ -83,7 +83,9 @@ foreach ($remote in $computers)
 	# install ossec-agent.exe
 	"[ ] Installing on $ip with $hostname"
 	"Installing on $ip with $hostname" | out-file $output -append
-    $FileExists =test-path "\\$ip\c$\program files (x86)\ossec-agent\ossec-agent.exe"
+    	
+	# test if already installed
+	$FileExists =test-path "\\$ip\c$\program files (x86)\ossec-agent\ossec-agent.exe"
 	if($FileExists -eq $True) {
 		write-host "     $ip already has ossec-agent installed. Continuing." | out-file $output -append
 	} else {
