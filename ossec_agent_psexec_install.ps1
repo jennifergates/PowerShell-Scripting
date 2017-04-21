@@ -78,11 +78,39 @@ foreach ($remote in $computers)
 	$hostname = $remote[0]
 	$ip = $remote[1]
 	$keyfile = $hostname + "_client.keys"
-	write-host $keyfile
-	"Installing on $hostname"#| out-file $output -append
-	"__________________________________________________________________________" >> $output
-    & C:\Users\Administrator\Desktop\SysInternals\PsExec.exe \\$ip -u $user -p $pass -c ossec-agent-win32-2.8.3.exe /S -accepteula >> $output
+	#write-host $keyfile
 	
-	#need to finish command - copy keys file to correct location.
-	& C:\Users\Administrator\Desktop\SysInternals\PsExec.exe \\$ip -u $user -p $pass cmd /c copy -accepteula >> $output
+	# install ossec-agent.exe
+	"[ ] Installing on $ip with $hostname"
+	"Installing on $ip with $hostname" | out-file $output -append
+    $FileExists =test-path "\\$ip\c$\program files (x86)\ossec-agent\ossec-agent.exe"
+	if($FileExists -eq $True) {
+		write-host "     $ip already has ossec-agent installed. Continuing." | out-file $output -append
+	} else {
+		& C:\Users\Administrator\Desktop\SysInternals\PsExec.exe \\$ip -u $user -p $pass -c ossec-agent-win32-2.8.3.exe /S -accepteula >> $output
+	}
+	
+	# copy config file to correct location.
+	"[ ] Copying $config"
+	"Copying $config" | out-file $output -append
+	copy-item -path "\\$ip\c$\program files (x86)\ossec-agent\ossec.conf" -destination "\\$ip\c$\program files (x86)\ossec-agent\ossec-conf.bak" -force >> $output
+	
+	copy-item -path $config -destination "\\$ip\c$\program files (x86)\ossec-agent\ossec.conf" -force >> $output
+	
+	# copy corresponding host client.keys file 
+	if($keys.substring($keys.length-1) -eq "\") {
+		$keys = $keys.substring(0,$keys.length-1)
+		}
+	
+	$keyfile = $keys + "\" + $hostname + "_client.keys"
+	"[ ] Copying $keyfile to $hostname"
+	"Copying $keyfile to $hostname" | out-file $output -append
+	copy-item -path $keyfile -destination "\\$ip\c$\program files (x86)\ossec-agent\client.keys" -force >> $output
+	
+	# start service
+	"[ ] Starting ossec-agent service"
+	"Starting ossec-agent service" | out-file $output -append
+	get-service -computer $ip "OSSEC HIDS" | start-service 
+	
+	"____________________________________________" | out-file $output -append
 }
