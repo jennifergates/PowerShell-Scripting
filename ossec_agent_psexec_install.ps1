@@ -112,7 +112,7 @@ foreach ($remote in $computers)
 	# start service
 	"[ ] Starting ossec-agent service"
 	"Starting ossec-agent service" | out-file $output -append
-	get-service -computer $ip "OSSEC HIDS" | start-service 
+	get-service -computer $ip "OSSEC HIDS" | set-service -status running
 	
 	"____________________________________________" | out-file $output -append
 }
