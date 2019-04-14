@@ -4,7 +4,7 @@
 # 4634 - An account was successfully logged off.
 # 4672 - Special Privileges assigned to new logon
 ################################
-Get-Event -FilterHashtable @{LogName="Security"; ID=4624,4634,2672}
+Get-winEvent -FilterHashtable @{LogName="Security"; ID=4624,4634,4672}
 
 
 #### Security Log Critical Events ################################
