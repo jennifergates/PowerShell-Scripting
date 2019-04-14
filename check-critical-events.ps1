@@ -1,4 +1,12 @@
 ﻿
+#### Security Log Logon Events ################################
+# 4624 - An account was successfully logged on.
+# 4634 - An account was successfully logged off.
+# 4672 - Special Privileges assigned to new logon
+################################
+Get-Event -FilterHashtable @{LogName="Security"; ID=4624,4634,2672}
+
+
 #### Security Log Critical Events ################################
 # 4720 - A user account was created
 # 4722 - (626) A user account was enabled
