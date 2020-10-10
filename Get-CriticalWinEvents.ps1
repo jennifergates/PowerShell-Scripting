@@ -212,7 +212,12 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		foreach ($ComputerName in $ComputerNames) {
 			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
 			try {
-				Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} @MaxEvents -ErrorAction stop |  foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+				$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object { $_ | convertto-json  }
+				#write to file as a list/array of json objects so convertfrom-json works in later scripts.
+				"[" | out-file $OutputFile -append
+				[string]::join(",",$jsonEvents) | out-file $OutputFile -append
+				"]" | out-file $OutputFile -append
+				
 			} catch {
 				if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
 					write-host "No Critical Events found in $LogFile ." -foregroundcolor Yellow			
@@ -242,8 +247,14 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 			foreach ($CatLogFile in $CatLogFiles) {
 				$id = $CatEvents | where-object -property LogFilefull -eq $CatLogFile | select-object -property eventid -expandproperty eventid 
 				try {
-					Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
-				} catch {
+					$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json} 
+					
+					#write to file as a list/array of json objects so convertfrom-json works in later scripts.
+					"[" | out-file $OutputFile -append
+					[string]::join(",",$jsonEvents) | out-file $OutputFile -append
+					"]" | out-file $OutputFile -append
+					
+					} catch {
 					if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
 						write-host "No Critical Events found in $CatLogFile for category $category ." -foregroundcolor Yellow
 					}
