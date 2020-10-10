@@ -47,7 +47,6 @@
             1.00 - initial script 
     
         Output Colors:
-        White - Input Required
         Cyan - Informational
         Yellow - Warning
         Red - Error
@@ -83,37 +82,38 @@ Param(
 	
 )
 
-
-#-------------------------------- Variables --------------------------------#
+#-------------------------------- Input Verification --------------------------------#
 if ($OutputDir[-1] -ne "\") {
 	$OutputDir = $OutputDir + "\"
 }
+
+if (-not (test-path $OutputDir)) {
+	write-host "$OutputDir does not exist. Please run again with a valid output directory" -foregroundcolor Red
+	exit
+}
+
+if (-not (test-path $CriticalEventsFile)) {
+	write-host "$CriticalEventsFile does not exist. Please run again with a valid Critical Events file." -foregroundcolor Red
+	exit
+}
+
+
+#-------------------------------- Variables --------------------------------#
+$TimeRun = get-date -UFormat "%Y%m%dT%H%M%S"
+$CriticalEvents = import-csv $CriticalEventsFile
+
 
 <# $cred = get-credential
 $pass = $cred.getnetworkcredential().password
 $user = $cred.username #>
 
-<# $loglookup = @{'Application' = 'Application';
-	'Setup' = 'Setup';
-	'System' = 'System';
-	'WindowsUpdateClient' = 'Microsoft-Windows-WindowsUpdateClient/Operational';
-	'PrintService' = 'Microsoft-Windows-PrintService/Operational';
-	'KernelPnPDeviceConfiguration' = 'Microsoft-Windows-Kernel-PnP/Device Configuration';
-	'ProgramInventory' = 'Microsoft-Windows-Application-Experience/Program-Inventory';
-	'WindowsDefender' = 'Microsoft-Windows-Windows Defender/Operational';
-	'Security' = 'Security';
-	'WindowsFirewall' = 'Microsoft-Windows-Windows Firewall With Advanced Security/Firewall';
-	'CodeIntegrity' = 'Microsoft-Windows-CodeIntegrity/Operational';
-	'WLANAutoConfig' = 'Microsoft-Windows-WLAN-AutoConfig/Operational';
-	'AppLockerEXEandDLL' = 'Microsoft-Windows-AppLocker/EXE and DLL';
-	'NetworkProfile' = 'Microsoft-Windows-NetworkProfile/Operational'
-} #>
 
-$CriticalEvents = import-csv $CriticalEventsFile
+#-------------------------------- Main --------------------------------#
+# Retrieving Critical Events from specified log files
 
 if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 	foreach ($LogFile in $LogFiles){
-		$OutputFile = $OutputDir + $LogFile + '_events.json'
+		$OutputFile = $OutputDir + $LogFile + '_' + $TimeRun +'_events.json'
 		$LogName = ($CriticalEvents | where-object -property LogFileshort -eq $LogFile   | select-object -property LogFilefull -first 1).LogFilefull
 		$id = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid -expandproperty eventid 
 		$CritInfo = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid,description 
@@ -137,10 +137,10 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 	}
 	
 	
-	
+# Retrieving Critical Events from specified categories
 } else {
 	foreach ($category in $Categories) {
-		$OutputFile = $category + '_events.json'
+		$OutputFile = $OutputDir + $category + '_' + $TimeRun  + '_events.json'
 		$catevents = $CriticalEvents | where-object -property category -eq $category
 		$catLogFiles = $catevents | select-object -property LogFilefull -unique -expandproperty LogFilefull
 		$CritInfo = $catevents | select-object -property eventid,description
