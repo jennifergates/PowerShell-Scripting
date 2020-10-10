@@ -4,7 +4,7 @@
     .Description
 		This script is configured to retrieve critical events from the Windows Event Log.
 		The critical events are those identifed in the NSA Whitepaper "Spotting the Adversary 
-		with Windows Event Log Monitoring". Alternatively, you supply a properly formatted 
+		with Windows Event Log Monitoring". Alternatively, you can supply a properly formatted 
 		CSV file with Critical Events.  The script can retrieve all critical events from a 
 		specified log file, or it can retrieve all critical events from a particular threat 
 		category as specified in the whitepaper. The script will retrieve the logs from the 
@@ -13,8 +13,30 @@
 		format for easy parsing or import into other tools.
 		
     .Example
-        ./Get-CriticalWinEvents.ps1 -ComputerName
-
+		.\Get-CriticalWinEvents.ps1 -Categories All -Max 2 -OutputDir .\testoutputfiles
+		
+		For each category, retrieves a maximum of 2 events per log file and writes the output
+		in JSON format to a file in the testoutputfiles directory. Each file is named with 
+		the category and time run. 
+		Ex: .\testoutputfiles\AccountActivity_20201010T1305_events.json
+		
+	.Example
+		.\Get-CriticalWinEvents.ps1 -Categories SoftwareAndServiceInstallation -OutputDir .\testoutputfiles\
+		
+		For the category SoftwareAndServiceInstallation, retrieves all events for each log file 
+		that contains SoftwareAndServiceInstallation critical events as defined in the Critical Events 
+		file. Writes the output in JSON format to a file in the testoutputfiles directory. The file
+		is named with the category and time run. 
+		Ex: .\testoutputfiles\SoftwareAndServiceInstallation_20201010T1328_events.json
+		
+	.Example
+		.\Get-CriticalWinEvents.ps1 -LogFiles Security -OutputDir .\testoutputfiles\
+		
+		For the Security log, retrieves all events for any category as defined in the Critical
+		Events file. Writes the output in JSON format to a file in the testoutputfiles directory. The file
+		is named with the log file short name and time run.
+		Ex: .\testoutputfiles\Security_20201010T1335_events.json
+		
     .Parameter ComputerNames
         [Optional] Comma separated list of computer hostnames to retrieve critical events from. 
 		Type the NetBIOS name, an Internet Protocol (IP) address, or the fully qualified
@@ -24,16 +46,56 @@
         [Optional] Maximum number of events to return. Default is all events.
 		
 	.Parameter CriticalEventsFile
-		[Optional] Specifies the path to the csv file containing the critical events 
-		(Event ID, Category, Description, LogFileFull, and LogFileshort)
+		Specifies the path to the csv file containing the critical events and their info.
+		This file is required for the script to run. By default, it looks for the file named 
+		CriticalEvents.csv located in the same directory. 
+		
+		If specifying a different file, it MUST be in the format: 
+		EventID,Category,Description,LogFileFull,LogFileshort
+		and use the Categories and shortened File names as listed in the Categories and LogFiles 
+		Parameters.
 		
 	.Parameter Categories
         Specifies to retrieve all critical events from a particular category, regardless of log 
 		file location.
+		Possible Categories:
+			All	
+			AccountActivity	
+			ApplicationCrashes
+			ApplicationWhitelisting
+			ClearingEventLogs
+			DriverManagement
+			ExternalMediaDetection
+			GroupPolicyErrors
+			KernelDriveSigning
+			MobileDeviceActivity
+			PrintingServices
+			SoftwareAndServiceInstallation
+			SystemOrServiceFailures
+			WindowsDefenderActivity
+			WindowsFirewall
+			WindowsUpdateErrors
 		
 	.Parameter LogFiles	
 		Specifies to retrieve all critical events from a particular log file, regardless of category 
-		of events. This is the default functionality if neither LogFiles or Categories are specified.
+		of events. This is the default functionality if neither LogFiles or Categories are specified. 
+		The log file names have been shortened for ease of use.
+		Possible Logfiles:
+			All
+			Application
+			Setup
+			System
+			WindowsUpdateClient
+			PrintService
+			KernelPnPDeviceConfiguration
+			ProgramInventory
+			WindowsDefender
+			Security
+			WindowsFirewall
+			CodeIntegrity
+			WLANAutoConfig
+			AppLockerEXEandDLL
+			NetworkProfile
 		
 	.Parameter OutputDir
 		Specifies the directory to save output files.
@@ -50,8 +112,13 @@
         Cyan - Informational
         Yellow - Warning
         Red - Error
+		
+	.Link
+		https://apps.nsa.gov/iaarchive/library/reports/spotting-the-adversary-with-windows-event-log-monitoring.cfm
 
 #>
+
+
 #-------------------------------- Parameters --------------------------------#
 [cmdletbinding(
         DefaultParameterSetName='byLogFile'
@@ -83,31 +150,39 @@ Param(
 )
 
 #-------------------------------- Input Verification --------------------------------#
+# Ensure output directory ends with \
 if ($OutputDir[-1] -ne "\") {
 	$OutputDir = $OutputDir + "\"
 }
 
+# ensure output directory exists
 if (-not (test-path $OutputDir)) {
 	write-host "$OutputDir does not exist. Please run again with a valid output directory" -foregroundcolor Red
 	exit
 }
 
+# ensure critical events file exists
 if (-not (test-path $CriticalEventsFile)) {
 	write-host "$CriticalEventsFile does not exist. Please run again with a valid Critical Events file." -foregroundcolor Red
 	exit
 }
 
+# set categories to all if 'All' was specified on the command line
 if ($Categories -contains 'All') {
 	$Categories = @('AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')
 }
 
+# set logfiles to all if 'All' was specified on the command line
 if ($LogFiles -contains 'All') {
 	$LogFiles = @('Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')
 }
 
 #-------------------------------- Variables --------------------------------#
-$TimeRun = get-date -UFormat "%Y%m%dT%H%M%S"
+$TimeRun = get-date -UFormat "%Y%m%dT%H%M"
+
 $CriticalEvents = import-csv $CriticalEventsFile
+
+# if a maximum number was specified, prepare the variable for "splatting" 
 if ($Max -ne 0) { 
 	$MaxEvents =  @{MaxEvents = $Max} 
 } else { 
