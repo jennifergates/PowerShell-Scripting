@@ -2,21 +2,42 @@
     .Synopsis
         This script will retrieve critical events from the windows event log and save them to a json file.
     .Description
-		This script is configured with critical events identifed by the NSA Whitepaper "Spotting the Adversary with Windows Event Log Monitoring"
-		It will retrieve 
+		This script is configured to retrieve critical events from the Windows Event Log.
+		The critical events are those identifed in the NSA Whitepaper "Spotting the Adversary 
+		with Windows Event Log Monitoring". Alternatively, you supply a properly formatted 
+		CSV file with Critical Events.  The script can retrieve all critical events from a 
+		specified log file, or it can retrieve all critical events from a particular threat 
+		category as specified in the whitepaper. The script will retrieve the logs from the 
+		localhost by default but can also be given a list of hostnames to connect to for retrieval.
+		The script will write the retrieved events to files by log file or category name in JSON 
+		format for easy parsing or import into other tools.
+		
     .Example
-        ./Get-CriticalWinEvents.ps1 -computername
+        ./Get-CriticalWinEvents.ps1 -ComputerName
 
-    .Parameter computernames
-        Computer hostname to connect to. Default is "localhost"
-	.Parameter max
-        Maximum number of events to return. Default is 1000. Use Zero (0) for all events.
-	.Parameter criticalevents_file
-		Specifies the csv file containing the critical events (Event ID, Category, Description, LogfileFull, and LogfileShort)
-	.Parameter categories
-        Specifies to retrieve all critical events from a particular category, regardless of log file location.
-	.Parameter logfiles	
-		Specifies to retrieve all critical events from a particular log file, regardless of category of events. This is the default functionality.
+    .Parameter ComputerNames
+        [Optional] Comma separated list of computer hostnames to retrieve critical events from. 
+		Type the NetBIOS name, an Internet Protocol (IP) address, or the fully qualified
+        domain name of the computer. Default is "localhost".
+		
+	.Parameter Max
+        [Optional] Maximum number of events to return. Default is all events.
+		
+	.Parameter CriticalEventsFile
+		[Optional] Specifies the path to the csv file containing the critical events 
+		(Event ID, Category, Description, LogFileFull, and LogFileshort)
+		
+	.Parameter Categories
+        Specifies to retrieve all critical events from a particular category, regardless of log 
+		file location.
+		
+	.Parameter LogFiles	
+		Specifies to retrieve all critical events from a particular log file, regardless of category 
+		of events. This is the default functionality if neither LogFiles or Categories are specified.
+		
+	.Parameter OutputDir
+		Specifies the directory to save output files.
+		
     .Notes
         NAME: ./Get-CriticalWinEvents.ps1
         AUTHOR: Jennifer Gates
@@ -34,35 +55,39 @@
 #>
 #-------------------------------- Parameters --------------------------------#
 [cmdletbinding(
-        DefaultParameterSetName='bylogfile'
+        DefaultParameterSetName='byLogFile'
     )]
 	
 Param(
 
-	[int] $max = 1000,
+	[int64 ] $Max = 0,
 	
-	[array] $computernames = (,"localhost"),
+	[array] $ComputerNames = (,"localhost"),
 	
-	[string] $criticalevents_file = "CriticalEvents.csv",
+	[string] $CriticalEventsFile = "CriticalEvents.csv",
+	
+	[string] $OutputDir = ".",
 	
 	[Parameter(
 		ParameterSetName='bycategory'
 	)]
 	[ValidateSet('AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')]
-	[array] $categories,
+	[array] $Categories,
 	
 	[Parameter(
-		ParameterSetName='bylogfile',
+		ParameterSetName='byLogFile',
 		Mandatory = $true
 	)]
 	[ValidateSet('Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')]
-	[array] $logfiles 
+	[array] $LogFiles 
 	
 )
 
 
 #-------------------------------- Variables --------------------------------#
-
+if ($OutputDir[-1] -ne "\") {
+	$OutputDir = $OutputDir + "\"
+}
 
 <# $cred = get-credential
 $pass = $cred.getnetworkcredential().password
@@ -84,25 +109,29 @@ $user = $cred.username #>
 	'NetworkProfile' = 'Microsoft-Windows-NetworkProfile/Operational'
 } #>
 
-$criticalevents = import-csv $criticalevents_file
+$CriticalEvents = import-csv $CriticalEventsFile
 
-if ($PSCmdlet.ParameterSetName -eq 'bylogfile') {
-	foreach ($logfile in $logfiles){
-		$outputfile = $logfile + '_events.json'
-		$logname = ($criticalevents | where-object {$_.logfileshort -eq $logfile }  | select-object -property logfilefull -first 1).logfilefull
-		$id = $criticalevents | where-object {$_.logfileshort -eq $logfile }  | select-object -property eventid -expandproperty eventid 
-		$critinfo = $criticalevents | where-object {$_.logfileshort -eq $logfile } | select-object -property eventid,description 
+if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
+	foreach ($LogFile in $LogFiles){
+		$OutputFile = $OutputDir + $LogFile + '_events.json'
+		$LogName = ($CriticalEvents | where-object -property LogFileshort -eq $LogFile   | select-object -property LogFilefull -first 1).LogFilefull
+		$id = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid -expandproperty eventid 
+		$CritInfo = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid,description 
 		
 		write-host ""
-		write-host "[] Retrieving critical events in $logfile log ($logname)." -foregroundcolor Cyan
+		write-host "[] Retrieving critical events in $LogFile log ($LogName)." -foregroundcolor Cyan
 		write-host "Critical Events Reference:" -foregroundcolor Cyan
-		$critinfo | ft eventid,description -wrap
+		$CritInfo | ft eventid,description -wrap
 
-		foreach ($computername in $computernames) {
-			write-host "Retrieving events from $computername." -foregroundcolor Cyan
-			get-winevent -computername $computername -filterhashtable @{Logname=$logname; ID=$id;} -max $max  |  foreach-object {$_ | ConvertTo-Json} | out-file $outputfile -append
+		foreach ($ComputerName in $ComputerNames) {
+			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
+			if ($Max -eq 0) {
+				get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;}  |  foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+			} else {
+				get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} -Max $Max  |  foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+			}
 			
-			write-host "[] Writing critical events to $outputfile." -foregroundcolor Green
+			write-host "[] Writing critical events to $OutputFile." -foregroundcolor Green
 			write-host ""
 		}
 	}
@@ -110,25 +139,28 @@ if ($PSCmdlet.ParameterSetName -eq 'bylogfile') {
 	
 	
 } else {
-	foreach ($category in $categories) {
-		$outputfile = $category + '_events.json'
-		$catevents = $criticalevents | where-object {$_.category -eq $category}
-		$catlogfiles = $catevents | select-object -property logfilefull -unique -expandproperty logfilefull
-		$critinfo = $catevents | select-object -property eventid,description
-		write-host $catlogfiles
+	foreach ($category in $Categories) {
+		$OutputFile = $category + '_events.json'
+		$catevents = $CriticalEvents | where-object -property category -eq $category
+		$catLogFiles = $catevents | select-object -property LogFilefull -unique -expandproperty LogFilefull
+		$CritInfo = $catevents | select-object -property eventid,description
 		
 		write-host ""
 		write-host "[] Retrieving critical events in $category." -foregroundcolor Cyan
 		write-host "Critical Events Reference:" -foregroundcolor Cyan
-		$critinfo | ft eventid,description -wrap
+		$CritInfo | ft eventid,description -wrap
 		
-		foreach ($computername in $computernames) {
-			write-host "Retrieving events from $computername." -foregroundcolor Cyan
-			foreach ($catlogfile in $catlogfiles) {
-				$id = $catevents | where-object ($_.logfilefull -eq $catlogfile) | select-object -property eventid -expandproperty eventid
-				get-winevent -computername $computername -filterhashtable @{Logname=$catlogfile; ID=$id;} -max $max | foreach-object {$_ | ConvertTo-Json} | out-file $outputfile -append
+		foreach ($ComputerName in $ComputerNames) {
+			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
+			foreach ($catLogFile in $catLogFiles) {
+				$id = $catevents | where-object -property LogFilefull -eq $catLogFile | select-object -property eventid -expandproperty eventid 
+				if ($Max -eq 0) {
+					get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$catLogFile; ID=$id;}  | foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+				} else {
+					get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$catLogFile; ID=$id;} -Max $Max  | foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+				}
 			}
-		write-host "[] Writing critical events to $outputfile." -foregroundcolor Green
+		write-host "[] Writing critical events to $OutputFile." -foregroundcolor Green
 		write-host ""
 		}
 	}	
