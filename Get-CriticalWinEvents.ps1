@@ -70,14 +70,14 @@ Param(
 	[Parameter(
 		ParameterSetName='bycategory'
 	)]
-	[ValidateSet('AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')]
+	[ValidateSet('All','AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')]
 	[array] $Categories,
 	
 	[Parameter(
 		ParameterSetName='byLogFile',
 		Mandatory = $true
 	)]
-	[ValidateSet('Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')]
+	[ValidateSet('All','Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')]
 	[array] $LogFiles 
 	
 )
@@ -97,11 +97,22 @@ if (-not (test-path $CriticalEventsFile)) {
 	exit
 }
 
+if ($Categories -contains 'All') {
+	$Categories = @('AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')
+}
+
+if ($LogFiles -contains 'All') {
+	$LogFiles = @('Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')
+}
 
 #-------------------------------- Variables --------------------------------#
 $TimeRun = get-date -UFormat "%Y%m%dT%H%M%S"
 $CriticalEvents = import-csv $CriticalEventsFile
-
+if ($Max -ne 0) { 
+	$MaxEvents =  @{MaxEvents = $Max} 
+} else { 
+	$MaxEvents = ''
+}
 
 <# $cred = get-credential
 $pass = $cred.getnetworkcredential().password
@@ -120,17 +131,18 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		
 		write-host ""
 		write-host "[] Retrieving critical events in $LogFile log ($LogName)." -foregroundcolor Cyan
-		write-host "Critical Events Reference:" -foregroundcolor Cyan
+		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
 		$CritInfo | ft eventid,description -wrap
 
 		foreach ($ComputerName in $ComputerNames) {
 			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
-			if ($Max -eq 0) {
-				get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;}  |  foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
-			} else {
-				get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} -Max $Max  |  foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+			try {
+				Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} @MaxEvents -ErrorAction stop |  foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+			} catch {
+				if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
+					write-host "No Critical Events found in $LogFile ." -foregroundcolor Yellow			
+				}
 			}
-			
 			write-host "[] Writing critical events to $OutputFile." -foregroundcolor Green
 			write-host ""
 		}
@@ -141,24 +153,27 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 } else {
 	foreach ($category in $Categories) {
 		$OutputFile = $OutputDir + $category + '_' + $TimeRun  + '_events.json'
-		$catevents = $CriticalEvents | where-object -property category -eq $category
-		$catLogFiles = $catevents | select-object -property LogFilefull -unique -expandproperty LogFilefull
-		$CritInfo = $catevents | select-object -property eventid,description
+		$CatEvents = $CriticalEvents | where-object -property category -eq $category
+		$CatLogFiles = $CatEvents | select-object -property LogFilefull -unique -expandproperty LogFilefull
+		$CritInfo = $CatEvents | select-object -property eventid,description
 		
 		write-host ""
 		write-host "[] Retrieving critical events in $category." -foregroundcolor Cyan
-		write-host "Critical Events Reference:" -foregroundcolor Cyan
+		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
 		$CritInfo | ft eventid,description -wrap
 		
 		foreach ($ComputerName in $ComputerNames) {
 			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
-			foreach ($catLogFile in $catLogFiles) {
-				$id = $catevents | where-object -property LogFilefull -eq $catLogFile | select-object -property eventid -expandproperty eventid 
-				if ($Max -eq 0) {
-					get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$catLogFile; ID=$id;}  | foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
-				} else {
-					get-winevent -ComputerName $ComputerName -filterhashtable @{LogName=$catLogFile; ID=$id;} -Max $Max  | foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+			foreach ($CatLogFile in $CatLogFiles) {
+				$id = $CatEvents | where-object -property LogFilefull -eq $CatLogFile | select-object -property eventid -expandproperty eventid 
+				try {
+					Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json} | out-file $OutputFile -append
+				} catch {
+					if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
+						write-host "No Critical Events found in $CatLogFile for category $category ." -foregroundcolor Yellow
+					}
 				}
+			
 			}
 		write-host "[] Writing critical events to $OutputFile." -foregroundcolor Green
 		write-host ""
