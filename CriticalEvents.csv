@@ -1,0 +1,127 @@
+EventID,Category,Description,LogfileFull,LogfileShort
+1,ApplicationCrashes,EMET Crash log,Application,Application
+2,ApplicationCrashes,EMET Crash log,Application,Application
+2,SoftwareAndServiceInstallation,Windows Update Package was successfully changed to the Installed state.,Setup,Setup
+6,SoftwareAndServiceInstallation,New Kernel Filter Driver,System,System
+19,SoftwareAndServiceInstallation,Installation successful: Windows successfully installed the following update: %1,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+20,WindowsUpdateErrors,Installation failure: Windows failed to install the following update with error %1: %2.,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+24,WindowsUpdateErrors,Uninstallation failure: Windows failed to uninstall the following update with error %1: %2,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+25,WindowsUpdateErrors,Automatic Updates Agent failed to check for updates with error %1.,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+31,WindowsUpdateErrors,Windows Update failed to download an update.,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+34,WindowsUpdateErrors,The Windows Update Client Core component failed to install a self-update with error %1.,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+35,WindowsUpdateErrors,The Windows Update Client Auxiliary component failed to install a self-update with error %1.,Microsoft-Windows-WindowsUpdateClient/Operational,WindowsUpdateClient
+104,ClearingEventLogs,Event log was cleared,System,System
+219,KernelDriveSigning,Failed kernel driver Loading,System,System
+307,PrintingServices,Printing a Document,Microsoft-Windows-PrintService/Operational,PrintService
+400,ExternalMediaDetection,Device was configured,Microsoft-Windows-Kernel-PnP/Device Configuration,KernelPnPDeviceConfiguration
+410,ExternalMediaDetection,Device was started,Microsoft-Windows-Kernel-PnP/Device Configuration,KernelPnPDeviceConfiguration
+800,SoftwareAndServiceInstallation,Summary of Software Activities,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+865,ApplicationWhitelisting,Software Restriction Policy Event Access Disabled By Policy Default,Application,Application
+866,ApplicationWhitelisting,Software Restriction Policy Event Access Disabled By Policy Path,Application,Application
+867,ApplicationWhitelisting,Software Restriction Policy Event Access Disabled By Policy Publisher,Application,Application
+868,ApplicationWhitelisting,Software Restriction Policy Event Access Disabled By Policy Other,Application,Application
+882,ApplicationWhitelisting,Software Restriction Policy Event Access Disabled No Safer UI By Policy,Application,Application
+903,SoftwareAndServiceInstallation,New Application Installation,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+904,SoftwareAndServiceInstallation,New Application Installation,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+905,SoftwareAndServiceInstallation,Updated Application,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+906,SoftwareAndServiceInstallation,Updated Application,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+907,SoftwareAndServiceInstallation,Removed Application,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+908,SoftwareAndServiceInstallation,Removed Application,Microsoft-Windows-Application-Experience/Program-Inventory,ProgramInventory
+1000,ApplicationCrashes,Application Error,Application,Application
+1001,ApplicationCrashes,Blue Screen of Death (BSOD),System,System
+1001,ApplicationCrashes,Windows Error Reporting,Application,Application
+1002,ApplicationCrashes,Application Hang,Application,Application
+1005,WindowsDefenderActivity,Malware protection scan failed,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1006,WindowsDefenderActivity,The antimalware engine found malware or other potentially unwanted software.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1008,WindowsDefenderActivity,"The antimalware platform attempted to perform an action to protect your system from malware or other potentially unwanted software, but the action failed.",Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1009,WindowsDefenderActivity,The antimalware platform restored an item from quarantine.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1009,WindowsUpdateErrors,Hotpatching Error,Setup,Setup
+1010,WindowsDefenderActivity,The antimalware platform could not restore an item from quarantine.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1015,WindowsDefenderActivity,The antimalware platform detected suspicious behavior.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1022,SoftwareAndServiceInstallation,Product: %1 - Update '%2' installed successfully.,Application,Application
+1033,SoftwareAndServiceInstallation,Product: %1. Version: %2. Language: %3. Installation completed with status: %4. Manufacturer: %5.,Application,Application
+1102,ClearingEventLogs,The audit log was cleared,Security,Security
+1116,WindowsDefenderActivity,The antimalware platform detected malware or other potentially unwanted software.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1117,WindowsDefenderActivity,The antimalware platform performed an action to protect your system from malware or other potentially unwanted software.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1118,WindowsDefenderActivity,"The antimalware platform attempted to perform an action to protect your system from malware or other potentially unwanted software, but the action failed.",Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1119,WindowsDefenderActivity,The antimalware platform encountered a critical error when trying to take action on malware or other potentially unwanted software.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+1125,GroupPolicyErrors,The processing of Group Policy failed because of an internal system error.,System,System
+1127,GroupPolicyErrors,The processing of Group Policy failed due to an internal error.,System,System
+1129,GroupPolicyErrors,The processing of Group Policy failed because of lack of network connectivity to a domain controller.,System,System
+2001,WindowsDefenderActivity,Malware protection signature update failed,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+2002,WindowsFirewall,A Windows Firewall setting has changed.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+2003,WindowsFirewall,Windows Firewall Configuration setting changed.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+2003,WindowsDefenderActivity,Malware protection engine update failed,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+2004,WindowsFirewall,A rule has been added to the Windows Firewall exception list.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+2004,WindowsDefenderActivity,Malware protection signature reversion,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+2005,WindowsFirewall,A rule has been modified in the Windows Firewall exception list.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+2006,WindowsFirewall,A rule has been deleted in the Windows Firewall exception list.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+2009,WindowsFirewall,The Windows Firewall service failed to load Group Policy.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+2033,WindowsFirewall,All rules have been deleted from the Windows Firewall configuration on this computer.,Microsoft-Windows-Windows Firewall With Advanced Security/Firewall,WindowsFirewall
+3001,KernelDriveSigning,Windows integrity error UnsignedDriverLoaded,Microsoft-Windows-CodeIntegrity/Operational,CodeIntegrity
+3002,WindowsDefenderActivity,Real-time protection encountered an error and failed.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+3002,KernelDriveSigning,Windows integrity error PageHashNotFound,Microsoft-Windows-CodeIntegrity/Operational,CodeIntegrity
+3003,KernelDriveSigning,Windows integrity error PageHashNotFound_DbgAttached,Microsoft-Windows-CodeIntegrity/Operational,CodeIntegrity
+3004,KernelDriveSigning,Windows integrity error FileHashNotFound,Microsoft-Windows-CodeIntegrity/Operational,CodeIntegrity
+3010,KernelDriveSigning,Windows integrity error LoadCatalogFailed,Microsoft-Windows-CodeIntegrity/Operational,CodeIntegrity
+3023,KernelDriveSigning,Windows integrity error RevokedDriverNotLoaded,Microsoft-Windows-CodeIntegrity/Operational,CodeIntegrity
+4624,AccountActivity,An account was successfully logged on.,Security,Security
+4625,AccountActivity,An account failed to log on,Security,Security
+4634,AccountActivity,An account was successfully logged off.,Security,Security
+4648,AccountActivity,A logon was attempted using explicit credentials,Security,Security
+4672,AccountActivity,Special Privileges assigned to new logon,Security,Security
+4720,AccountActivity,A user account was created,Security,Security
+4722,AccountActivity,(626) A user account was enabled,Security,Security
+4724,AccountActivity,An attempt was made (not by the user) to reset an account's password and it failed to meet password policy,Security,Security
+4728,AccountActivity,A member was added to a security-enabled global group,Security,Security
+4732,AccountActivity,A member was added to a security-enabled local group,Security,Security
+4735,AccountActivity,A security-enabled local group was changed,Security,Security
+4738,AccountActivity,A user account was changed. Subject account did the changing to the Target account.,Security,Security
+4740,AccountActivity,A user account was locked out,Security,Security
+4756,AccountActivity,A member was added to a security-enabled universal group,Security,Security
+5001,WindowsDefenderActivity,Real-time protection is disabled.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+5004,WindowsDefenderActivity,The real-time protection configuration changed.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+5007,WindowsDefenderActivity,The antimalware platform configuration changed.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+5008,WindowsDefenderActivity,The antimalware engine encountered an error and failed.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+5010,WindowsDefenderActivity,Scanning for malware and other potentially unwanted software is disabled.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+5012,WindowsDefenderActivity,Scanning for viruses is disabled.,Microsoft-Windows-Windows Defender/Operational,WindowsDefender
+5038,KernelDriveSigning,Code integrity determined that the image hash of a file is not valid.,Security,Security
+6281,KernelDriveSigning,Code Integrity determined that the page hashes of an image file are not valid.,Security,Security
+7022,SystemOrServiceFailures,The Distributed Transaction Coordinator service hung on starting.,System,System
+7023,SystemOrServiceFailures,Service Terminated,System,System
+7024,SystemOrServiceFailures,The Service terminated with a service specific error,System,System
+7026,SystemOrServiceFailures,The following boot-start or system-start driver(s) failed to load: %1,System,System
+7030,SystemOrServiceFailures,Service marked as an interactive service but system configured to not allow interactive services.,System,System
+7031,SystemOrServiceFailures,The %1 service terminated unexpectedly.,System,System
+7032,SystemOrServiceFailures,?,System,System
+7034,SystemOrServiceFailures,Service Terminated,System,System
+7045,SoftwareAndServiceInstallation,New Service Creation,System,System
+8000,MobileDeviceActivity,WLAN AutoConfig service started a connection to a wireless network.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+8001,MobileDeviceActivity,WLAN AutoConfig service has successfully connected to a wireless network.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+8002,MobileDeviceActivity,WLAN AutoConfig service failed to connect to a wireless network.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+8003,ApplicationWhitelisting,Applied only when the Audit only enforcement mode is enabled. Specifies that the .exe or .dll file would be blocked if the Enforce rules enforcement mode were enabled.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8003,MobileDeviceActivity,WLAN AutoConfig service has successfully disconnected from a wireless network.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+8004,ApplicationWhitelisting,Access to <file name> is restricted by the administrator. Applied only when the Enforce rules enforcement mode is set. The .exe or .dll file cannot run.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8006,ApplicationWhitelisting,Applied only when the Audit only enforcement mode is enabled. Specifies that the script or .msi file would be blocked if the Enforce rules enforcement mode were enabled.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8007,ApplicationWhitelisting,Access to <file name> is restricted by the administrator. Applied only when the Enforce rules enforcement mode is set. The script or .msi file cannot run.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8011,MobileDeviceActivity,Connect to last good network,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+8021,ApplicationWhitelisting,Packaged app audited.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8022,ApplicationWhitelisting,Packaged app disabled.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8024,ApplicationWhitelisting,Packaged app installation audited.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+8025,ApplicationWhitelisting,Packaged app installation disabled.,Microsoft-Windows-AppLocker/EXE and DLL,AppLockerEXEandDLL
+10000,MobileDeviceActivity,Network Connection Status (Wired and Wireless),Microsoft-Windows-NetworkProfile/Operational,NetworkProfile
+10001,MobileDeviceActivity,Network Disconnection Status (Wired and Wireless),Microsoft-Windows-NetworkProfile/Operational,NetworkProfile
+11000,MobileDeviceActivity,Wireless network association started.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+11001,MobileDeviceActivity,Wireless network association succeeded.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+11002,MobileDeviceActivity,Wireless network association failed,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+11004,MobileDeviceActivity,Wireless security stopped.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+11005,MobileDeviceActivity,Wireless security succeeded,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+11006,MobileDeviceActivity,Wireless security failed.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+11010,MobileDeviceActivity,Wireless security started.,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+12011,MobileDeviceActivity,Wireless 802.1x authentication started,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+12012,MobileDeviceActivity,Wireless 802.1x authentication succeeded,Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+12013,MobileDeviceActivity,Wireless 802.1x authentication failed (The authenticator is no longer present),Microsoft-Windows-WLAN-AutoConfig/Operational,WLANAutoConfig
+20001,DriverManagement,Driver Mgmt device installation - success or error code for failure,System,System
+20002,DriverManagement,Device attemped to connect but could not be authenticated and was rejected.,System,System
+20003,DriverManagement,Driver Mmgt device instance service installation,System,System
+24576,DriverManagement,Drivers successfully installed for device.,System,System
