@@ -1,6 +1,7 @@
 ﻿<#
     .Synopsis
         This script will retrieve critical events from the windows event log and save them to a json file.
+		
     .Description
 		This script is configured to retrieve critical events from the Windows Event Log.
 		The critical events are those identifed in the NSA Whitepaper "Spotting the Adversary 
@@ -189,9 +190,34 @@ if ($Max -ne 0) {
 	$MaxEvents = ''
 }
 
-<# $cred = get-credential
+<#   Still need to incorporate or address if remote computers will be accessed
+$cred = get-credential
 $pass = $cred.getnetworkcredential().password
 $user = $cred.username #>
+
+#-------------------------------- Functions --------------------------------#
+function Write-ToJsonFile{
+
+	param (
+		[string]$outfile,
+		[string]$text
+	)
+	
+	#write-host $outfile
+	if ($text.length -gt 5) {
+		# remove the final comma before closing the list
+		if ($text[-1] -eq ',') {
+			$text = $text.substring(0,$text.length-1) 
+			$text +=  "]"
+		}
+
+		write-host "[] Writing critical events to $outfile." -foregroundcolor Green
+		write-host ""
+		# write complete json of all objects for all log files for a particular category
+		$text | out-file $outfile -append -encoding unicode
+	}
+	 
+}
 
 
 #-------------------------------- Main --------------------------------#
@@ -208,24 +234,28 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		write-host "[] Retrieving critical events in $LogFile log ($LogName)." -foregroundcolor Cyan
 		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
 		$CritInfo | ft eventid,description -wrap
-
+		
+		# create variable to hold string output to write to file and start it with "["
+		$jsonOutput = "["
+		
 		foreach ($ComputerName in $ComputerNames) {
 			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
 			try {
 				$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object { $_ | convertto-json  }
-				#write to file as a list/array of json objects so convertfrom-json works in later scripts.
-				"[" | out-file $OutputFile -append
-				[string]::join(",",$jsonEvents) | out-file $OutputFile -append
-				"]" | out-file $OutputFile -append
+				# join each object's json with a comma as a list/array of json objects and add to output string
+				$jsonOutput += [string]::join(",",$jsonEvents)
+				# need a trailing , between json object lists for each logfile in a specific category.
+				$jsonOutput += ','
 				
 			} catch {
 				if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
 					write-host "No Critical Events found in $LogFile ." -foregroundcolor Yellow			
 				}
 			}
-			write-host "[] Writing critical events to $OutputFile." -foregroundcolor Green
-			write-host ""
+		
 		}
+		Write-ToJsonFile -outfile $OutputFile -text $jsonOutput
+		
 	}
 	
 	
@@ -242,28 +272,32 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
 		$CritInfo | ft eventid,description -wrap
 		
+		# create variable to hold string output to write to file and start it with "["
+		$jsonOutput = "["
+		
 		foreach ($ComputerName in $ComputerNames) {
 			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
 			foreach ($CatLogFile in $CatLogFiles) {
 				$id = $CatEvents | where-object -property LogFilefull -eq $CatLogFile | select-object -property eventid -expandproperty eventid 
 				try {
-					$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json} 
+					$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json } 
 					
-					#write to file as a list/array of json objects so convertfrom-json works in later scripts.
-					"[" | out-file $OutputFile -append
-					[string]::join(",",$jsonEvents) | out-file $OutputFile -append
-					"]" | out-file $OutputFile -append
+					# join each object's json with a comma as a list/array of json objects and add to output string
+					$jsonOutput += [string]::join(",",$jsonEvents)
+					# need a trailing , between json object lists for each logfile in a specific category.
+					$jsonOutput += ','
 					
-					} catch {
+				} catch {
 					if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
 						write-host "No Critical Events found in $CatLogFile for category $category ." -foregroundcolor Yellow
 					}
 				}
 			
 			}
-		write-host "[] Writing critical events to $OutputFile." -foregroundcolor Green
-		write-host ""
 		}
+
+		Write-ToJsonFile -outfile $OutputFile -text $jsonOutput
+
 	}	
 }
 
