@@ -14,6 +14,11 @@
 	.Parameter InputDirectory
         Specifies the path to the directory where the JSON files are stored. The default is the current directory.
 		
+	.Parameter CriticalEventsFile
+		Specifies the path to the csv file that was used when retrieving the event logs with 
+		Get-CriticalWinEvents.ps1. This file is required for the script to run. By default, it 
+		looks for the file named CriticalEvents.csv located in the same directory. 
+		
 	.Parameter OutputDirectory
 		Specifies the path to write the analysis files. The default is the current directory.
 		
@@ -41,12 +46,18 @@ Param(
 	
 	[string] $InputDirectory = ".",
 	
+	[string] $CriticalEventsFile = "CriticalEvents.csv",
+	
 	[string] $OutputDirectory = "."
 	
 )
 
 
 #-------------------------------- Input Verification --------------------------------#
+# Ensure output directory ends with \
+if ($OutputDirectory[-1] -ne "\") {
+	$OutputDirectory = $OutputDirectory + "\"
+}
 # Ensure output directory exists
 if (-not (test-path $OutputDirectory)) {
 	write-host "$OutputDirectory does not exist. Please run again with a valid output directory" -foregroundcolor Red
@@ -63,25 +74,43 @@ if (-not (test-path $InputDirectory)) {
 
 #-------------------------------- Variables --------------------------------#
 $TimeRun = get-date -UFormat "%Y%m%dT%H%M"
+$OutputFile = $OutputDirectory + 'CriticalWinEventsAnalysis_' + $TimeRun + ".txt"
 
+$CriticalEvents = import-csv $CriticalEventsFile
 
 
 #-------------------------------- Main --------------------------------#
 
 # Read in all files to create one array of all event objects
+write-host "[] Reading in files from $InputDirectory" -foregroundcolor cyan
+
 $AllEventFiles = get-childitem $InputDirectory
 
 $ListOfFileEventLists= foreach ($EventFile in $AllEventFiles){ get-content $EventFile.FullName | convertfrom-json}
 $AllEvents = foreach ($FileEventList in $ListOfFileEventLists) { $FileEventList }
 
-# Gather some basic statistics
-write-host "Basic Statistics:" -foregroundcolor Cyan
-write-host "Total number of files: " $AllEventFiles.count
-write-host "Total number of events: " $AllEvents.count
+write-host "[] Calculating statistics" -foregroundcolor cyan
+
+function Write-ToFile() {
+	# Gather some basic statistics
+	"======================== Critical Windows Events Analysis ==================="
+	"`nThe following files were analyzed: "
+	"Directory: $OutputDirectory "
+	get-childitem $InputDirectory | format-table Name,LastWriteTime,Length
+	"`n----------------------- Basic Statistics -----------------------" 
+	"`nTotal number of files: $($AllEventFiles.count)"
+	"Total number of events: $($AllEvents.count)"
+	
+	"`nNumber of Events Retrieved by Event ID:"
+	$AllEvents | Group-Object -Property id | format-table Count,@{Label="EventID"; Expression={$_.Name}}
+	
+	"`nNumber of Events Retrieved by Log Name:"
+	$AllEvents | Group-Object -Property LogName | format-table Count,@{Label="LogName"; Expression={$_.Name}}
+}
 
 
-
-
+write-host "[] Writing output to $OutputFile" -foregroundcolor cyan
+Write-ToFile | write-output | out-file $OutputFile -encoding unicode
 
 
 
