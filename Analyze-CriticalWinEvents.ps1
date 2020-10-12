@@ -83,7 +83,7 @@ $CriticalEvents = import-csv $CriticalEventsFile
 
 
 #------------------------- REGEX Definitions ------------------------------
-[regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AccName>[^\n]*)\n.*\n.*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
+[regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AcctName>[^\n]*)\n.*\n.*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
 
 
 #------------------------- function ------------------------------
@@ -165,11 +165,18 @@ function Write-ToFile() {
 	"============================================================================="
 	$All4624Details | group-object -property LogonType,NewLogonAcctName,NetInfoSrcAddr | sort-object -Property count -Descending | format-table Count,@{Label="LogonType, NewLogonAcctName, NetInfoSrcAddr"; Expression={$_.Name}} -wrap
 
+	"`n============================================================================="
+	"Number of Event ID 4624, Logon Type 3 Events by Auth Package, New Logon Account 
+	Name, and New Logon Account Domain (Pass-The-Hash Indicator):"
+	"============================================================================="
+	
+	$All4624Details | where-object -property EventID -eq 4624 | where-object -property LogonType -eq 3 | group-object -property AuthPkg,NewLogonAcctName,NewLogonAcctDom | format-table Count,@{Label="Authpkg, NewLogonAcctName, NewLogonAcctName"; Expression={$_.Name}} -wrap
+	
 }
+
 
 
 write-host "[] Writing output to $OutputFile" -foregroundcolor cyan
 Write-ToFile | write-output | out-file $OutputFile -encoding utf8
-
 
 
