@@ -82,6 +82,34 @@ $OutputFile = $OutputDirectory + 'CriticalWinEventsAnalysis_' + $TimeRun + ".txt
 $CriticalEvents = import-csv $CriticalEventsFile
 
 
+#------------------------- REGEX Definitions ------------------------------
+[regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AccName>[^\n]*)\n.*\n.*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
+
+
+#------------------------- function ------------------------------
+function Get-VarFromRegex {
+
+param (
+	[string]$EventID,
+	[string]$EventMessage,
+	[regex]$VarRegex
+)
+	#return [regex]::Match($EventMessage, $VarRegex)#.captures.groups
+	$m = $VarRegex.match($EventMessage)
+
+	$ret = new-Object -TypeName psobject
+	$ret | Add-Member -MemberType NoteProperty -Name EventID -Value $EventID
+	foreach ($var in $m.groups) {
+		if ($var.name -ne 0 ){
+			$ret | Add-Member -MemberType NoteProperty -Name $var.name -Value $var.value
+		}
+	}
+	return $ret
+
+}
+
+
+
 #-------------------------------- Main --------------------------------#
 
 # Read in all files to create one array of all event objects
@@ -91,6 +119,12 @@ $AllEventFiles = get-childitem $InputDirectory
 
 $ListOfFileEventLists= foreach ($EventFile in $AllEventFiles){ get-content $EventFile.FullName | convertfrom-json}
 $AllEvents = foreach ($FileEventList in $ListOfFileEventLists) { $FileEventList }
+
+# Get details from Event 4624 Message fields
+$All4624Messages = $AllEvents | where-object -property id -eq 4624| select-object -property message -expandproperty message
+$All4624Details = foreach ($EventMessage in $All4624Messages ){
+	Get-VarFromRegex -EventMessage $EventMessage -VarRegex $Fields4624 -EventID 4624
+}
 
 write-host "[] Calculating statistics" -foregroundcolor cyan
 
@@ -124,13 +158,18 @@ function Write-ToFile() {
 	"`n============================================================================="
 	"Number of Events Retrieved by Event Message:"
 	"============================================================================="
-	$AllEvents | Group-Object -Property message | sort-object -Property count -Descending| format-table Count,@{Label="Message"; Expression={$_.Name}} -Autosize
+	$AllEvents | Group-Object -Property message | sort-object -Property count -Descending | format-table Count,@{Label="Message"; Expression={$_.Name}} -Autosize
+	"`n`n"
+	"`n============================================================================="
+	"Number of Event ID 4624 Events by Logon Type, New Logon Account Name, and Network Info Source Address:"
+	"============================================================================="
+	$All4624Details | group-object -property LogonType,NewLogonAcctName,NetInfoSrcAddr | sort-object -Property count -Descending | format-table Count,@{Label="LogonType, NewLogonAcctName, NetInfoSrcAddr"; Expression={$_.Name}} -wrap
+
 }
 
 
 write-host "[] Writing output to $OutputFile" -foregroundcolor cyan
 Write-ToFile | write-output | out-file $OutputFile -encoding utf8
-
 
 
 
