@@ -83,8 +83,11 @@ $CriticalEvents = import-csv $CriticalEventsFile
 
 
 #------------------------- REGEX Definitions ------------------------------
-[regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AcctName>[^\n]*)\n.*\n.*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
+#[regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AcctName>[^\n]*)\n.*\n.*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
 
+[regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AccName>[^\n]*)\n.*\n\s*Logon ID:\s*(?<LogonID>[^\n]*)\s*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
+
+[regex]$Fields4634 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AccName>[^\n]*)\n.*\n\s*Logon ID:\s*(?<LogonID>[^\n]*)\s*\n.*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*"
 
 #------------------------- function ------------------------------
 function Get-VarFromRegex {
@@ -113,7 +116,7 @@ param (
 #-------------------------------- Main --------------------------------#
 
 # Read in all files to create one array of all event objects
-write-host "[] Reading in files from $InputDirectory" -foregroundcolor cyan
+write-host "[] Reading in files from $InputDirectory . `nDepending on the number and size of files, this could take a few minutes." -foregroundcolor cyan
 
 $AllEventFiles = get-childitem $InputDirectory
 
@@ -121,9 +124,21 @@ $ListOfFileEventLists= foreach ($EventFile in $AllEventFiles){ get-content $Even
 $AllEvents = foreach ($FileEventList in $ListOfFileEventLists) { $FileEventList }
 
 # Get details from Event 4624 Message fields
-$All4624Messages = $AllEvents | where-object -property id -eq 4624| select-object -property message -expandproperty message
+$All4624Messages = $AllEvents | where-object -property id -eq 4624 | select-object -property message -expandproperty message
 $All4624Details = foreach ($EventMessage in $All4624Messages ){
 	Get-VarFromRegex -EventMessage $EventMessage -VarRegex $Fields4624 -EventID 4624
+}
+
+# Get details from Event 4625 Message fields
+$All4625Messages = $AllEvents | where-object -property id -eq 4625 | select-object -property message -expandproperty message
+$All4625Details = foreach ($EventMessage in $All4625Messages ){
+	Get-VarFromRegex -EventMessage $EventMessage -VarRegex $Fields4624 -EventID 4625
+}
+
+# Get details from Event 4634 Message fields
+$All4634Messages = $AllEvents | where-object -property id -eq 4634 | select-object -property message -expandproperty message
+$All4634Details = foreach ($EventMessage in $All4634Messages ){
+	Get-VarFromRegex -EventMessage $EventMessage -VarRegex $Fields4634 -EventID 4634
 }
 
 write-host "[] Calculating statistics" -foregroundcolor cyan
@@ -167,15 +182,33 @@ function Write-ToFile() {
 
 	"`n============================================================================="
 	"Number of Event ID 4624, Logon Type 3 Events by Auth Package, New Logon Account 
-	Name, and New Logon Account Domain (Pass-The-Hash Indicator):"
+	Name, and New Logon Account Domain (Possible Successful Pass-The-Hash Indicator):"
 	"============================================================================="
 	
-	$All4624Details | where-object -property EventID -eq 4624 | where-object -property LogonType -eq 3 | group-object -property AuthPkg,NewLogonAcctName,NewLogonAcctDom | format-table Count,@{Label="Authpkg, NewLogonAcctName, NewLogonAcctName"; Expression={$_.Name}} -wrap
+	$All4624Details | where-object -property LogonType -eq 3 | group-object -property AuthPkg,NewLogonAcctName,NewLogonAcctDom | sort-object -Property count -Descending| format-table Count,@{Label="Authpkg, NewLogonAcctName, NewLogonAcctDom"; Expression={$_.Name}} -wrap
+
+	"`n============================================================================="
+	"Number of Event ID 4625, Logon Type 3 Events by Auth Package, New Logon Account 
+	Name, and New Logon Account Domain (Possible Failed Pass-The-Hash Indicator):"
+	"============================================================================="
+
+	$All4625Details | where-object -property LogonType -eq 3 | group-object -property AuthPkg,NewLogonAcctName,NewLogonAcctDom | sort-object -Property count -Descending| format-table Count,@{Label="Authpkg, NewLogonAcctName, NewLogonAcctName"; Expression={$_.Name}} -wrap
 	
+	"`n============================================================================="
+	"Number of Event ID 4624 Logon Type 10 Events by New Logon Account Name, and 
+	Network Info Source Address (Remote Desktop Logon):"
+	"============================================================================="
+	$All4624Details | where-object -property LogonType -eq 10 | group-object -property NewLogonAcctName,NetInfoSrcAddr | sort-object -Property count -Descending | format-table Count,@{Label="NewLogonAcctName, NetInfoSrcAddr"; Expression={$_.Name}} -wrap
+	
+	"`n============================================================================="
+	"Number of Event ID 4634 Logon Type 10 Events by Account Name, and Logon ID:"
+	"============================================================================="
+	$All4634Details | where-object -property LogonType -eq 10 | group-object -property AccName,LogonID | sort-object -Property count -Descending | format-table count,@{Label="Account Name, LogonID"; Expression={$_.Name}} -wrap
+	
+	#need to add the corresponding 4624 rdp logons for these logoffs.
 }
 
-
-
+ 
 write-host "[] Writing output to $OutputFile" -foregroundcolor cyan
 Write-ToFile | write-output | out-file $OutputFile -encoding utf8
 
