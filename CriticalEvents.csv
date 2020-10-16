@@ -125,3 +125,14 @@ EventID,Category,Description,LogfileFull,LogfileShort
 20002,DriverManagement,Device attemped to connect but could not be authenticated and was rejected.,System,System
 20003,DriverManagement,Driver Mmgt device instance service installation,System,System
 24576,DriverManagement,Drivers successfully installed for device.,System,System
+10,SysmonSecurity,Process accessed,Microsoft-Windows-Sysmon/Operational,Sysmon
+14,SysmonSecurity,Registry Key and Value Rename,Microsoft-Windows-Sysmon/Operational,Sysmon
+15,SysmonSecurity,File Create Stream Hash,Microsoft-Windows-Sysmon/Operational,Sysmon
+16,SysmonSecurity,Sysmon Config Change,Microsoft-Windows-Sysmon/Operational,Sysmon
+17,SysmonSecurity,Pipe Event Created,Microsoft-Windows-Sysmon/Operational,Sysmon
+18,SysmonSecurity,Pipe Event Connected,Microsoft-Windows-Sysmon/Operational,Sysmon
+255,SysmonSecurity,Sysmon error,Microsoft-Windows-Sysmon/Operational,Sysmon
+4,SysmonSecurity,Sysmon Service State Change,Microsoft-Windows-Sysmon/Operational,Sysmon
+6,SysmonSecurity,Driver Loaded,Microsoft-Windows-Sysmon/Operational,Sysmon
+1,SysmonSecurity,Process Create,Microsoft-Windows-Sysmon/Operational,Sysmon
+7,SysmonSecurity,Image Loaded,Microsoft-Windows-Sysmon/Operational,Sysmon

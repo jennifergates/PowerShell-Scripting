@@ -118,7 +118,11 @@
 		https://apps.nsa.gov/iaarchive/library/reports/spotting-the-adversary-with-windows-event-log-monitoring.cfm
 
 #>
+#Requires -RunAsAdministrator
 
+
+
+## NEED TO ADD SYSMON EVENTS
 
 #-------------------------------- Parameters --------------------------------#
 [cmdletbinding(
@@ -138,14 +142,14 @@ Param(
 	[Parameter(
 		ParameterSetName='bycategory'
 	)]
-	[ValidateSet('All','AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')]
+	[ValidateSet('All','AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SysmonSecurity','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')]
 	[array] $Categories,
 	
 	[Parameter(
 		ParameterSetName='byLogFile',
 		Mandatory = $true
 	)]
-	[ValidateSet('All','Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')]
+	[ValidateSet('All','Application','Setup','Sysmon','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')]
 	[array] $LogFiles 
 	
 )
@@ -170,12 +174,12 @@ if (-not (test-path $CriticalEventsFile)) {
 
 # set categories to all if 'All' was specified on the command line
 if ($Categories -contains 'All') {
-	$Categories = @('AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')
+	$Categories = @('AccountActivity','ApplicationCrashes','ApplicationWhitelisting','ClearingEventLogs','DriverManagement','ExternalMediaDetection','GroupPolicyErrors','KernelDriveSigning','MobileDeviceActivity','PrintingServices','SoftwareAndServiceInstallation','SysmonSecurity','SystemOrServiceFailures','WindowsDefenderActivity','WindowsFirewall','WindowsUpdateErrors')
 }
 
 # set logfiles to all if 'All' was specified on the command line
 if ($LogFiles -contains 'All') {
-	$LogFiles = @('Application','Setup','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')
+	$LogFiles = @('Application','Setup','Sysmon','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')
 }
 
 #-------------------------------- Variables --------------------------------#
