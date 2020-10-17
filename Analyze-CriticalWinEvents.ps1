@@ -54,6 +54,7 @@ Param(
 
 
 #-------------------------------- Input Verification --------------------------------#
+$timestart = get-date
 # Ensure output directory exists
 if (-not (test-path $OutputDirectory)) {
 	write-host "$OutputDirectory does not exist. Please run again with a valid output directory" -foregroundcolor Red
@@ -165,10 +166,43 @@ $All10Details = foreach ($EventMessage in $All10Messages) {
 
 # Get details from Event 1 Sysmon logs
 $All1Messages = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational" | where-object -property id -eq 1 | select-object -property message -expandproperty message
-#write-host $All1Messages[0]
+
 $All1Details = foreach ($EventMessage in $All1Messages){
 	Get-VarFromSplit -EventMessage $EventMessage -EventID 1
 }
+
+$AllSysmonMessages = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational"| select-object -property message -expandproperty message
+$AllSysmonDetails = foreach ($EventMessage in $AllSysmonMessages){
+	Get-VarFromSplit -EventMessage $EventMessage -EventID 999
+}
+
+# Get all hashes reported by Sysmon events and their corresponding file 
+$AllSysmonHashes = $AllSysmonDetails |where-object -property hashes -ne ""  -erroraction silentlycontinue 
+$AllSysmonHashesToFiles= foreach ($hashevent in $AllSysmonHashes) {
+	if (($hashevent.image -ne $null ) -and ($hashevent.imageloaded -ne $null)) {
+		$filehashes = new-Object -TypeName psobject
+		$filehashes | Add-Member -MemberType NoteProperty -Name FileVersion -Value $hashevent.FileVersion
+		if ($hashevent.image -ne $null) {
+			$filehashes | Add-Member -MemberType NoteProperty -Name File -Value $hashevent.image
+		} else {
+			$filehashes | Add-Member -MemberType NoteProperty -Name File -Value $hashevent.imageloaded
+		}
+		foreach ($hash in ($hashevent.hashes -split "," )) {
+			$filehashes | Add-Member -MemberType NoteProperty -Name ($hash -split "=")[0] -Value ($hash -split "=")[1]
+		}
+	}
+	$filehashes
+}
+
+
+
+
+
+
+
+# process create has command line. should do one on that.
+
+
 
 write-host "[] Calculating statistics" -foregroundcolor cyan
 
@@ -252,7 +286,15 @@ function Write-ToFile() {
 	"Number of Event ID 1 (Process Create) Sysmon Events where Image name doesn't equal Original File name"
 	"============================================================================="	
 	$All1Details | where-object { ($_.Image -split("\\"))[-1] -ne $_.OriginalFileName} |  group-object Image,OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Image"; Expression={($_.Name -split ",")[0]}},@{Label="OriginalFileName"; Expression={($_.Name -split ",")[1]}} -wrap
-
+	
+	"`n============================================================================="
+	"MD5 File Hashes reported in Sysmon Events "
+	"============================================================================="	
+	$AllSysmonHashesToFiles  | group-object -property file,fileversion,md5 | format-table count,@{Label="File"; Expression={($_.Name -split ",")[0]}},@{Label="FileVersion"; Expression={($_.Name -split ",")[1]}},@{Label="MD5"; Expression={($_.Name -split ",")[2]}} -wrap
+	
+	
+	"Processing Time: "
+	$(get-date) - $timestart | fl TotalMinutes
 }
 
  
