@@ -155,6 +155,9 @@ Param(
 )
 
 #-------------------------------- Input Verification --------------------------------#
+# ensure full paths are used even if relative is passed in
+$OutputDir = resolve-path $OutputDir
+
 # Ensure output directory ends with \
 if ($OutputDir[-1] -ne "\") {
 	$OutputDir = $OutputDir + "\"
@@ -218,7 +221,7 @@ function Write-ToJsonFile{
 		write-host "[] Writing critical events to $outfile." -foregroundcolor Green
 		write-host ""
 		# write complete json of all objects for all log files for a particular category
-		$text | out-file $outfile -append -encoding unicode
+		$text | out-file $outfile -append -encoding utf8
 	}
 	 
 }
@@ -243,7 +246,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		$jsonOutput = "["
 		
 		foreach ($ComputerName in $ComputerNames) {
-			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
+			write-host "[] Retrieving events from $ComputerName." -foregroundcolor Cyan
 			try {
 				$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id;} @MaxEvents -ErrorAction stop | foreach-object { $_ | convertto-json  }
 				# join each object's json with a comma as a list/array of json objects and add to output string
@@ -280,7 +283,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		$jsonOutput = "["
 		
 		foreach ($ComputerName in $ComputerNames) {
-			write-host "Retrieving events from $ComputerName." -foregroundcolor Cyan
+			write-host "[] Retrieving events from $ComputerName." -foregroundcolor Cyan
 			foreach ($CatLogFile in $CatLogFiles) {
 				$id = $CatEvents | where-object -property LogFilefull -eq $CatLogFile | select-object -property eventid -expandproperty eventid 
 				try {
@@ -304,4 +307,22 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 
 	}	
 }
+
+# Create Readme to describe importing into splunk
+$OutputReadme = $OutputDir + "SplunkDataUpload_README.txt"
+write-host "`nANALYSIS:`n`nTo properly import the json output files into Splunk, follow the instructions in $OutputReadme file. `n" -foregroundcolor Yellow
+write-host "To get summary data and run a hasty analysis, run the Analyze-CriticalWinEvents.ps1 script on the json output files.`n`n`n" -foregroundcolor Yellow
+
+"# How to Ingest json files created by Get-CriticalWinEvents.ps1 `n
+1) In Splunk, click on 'Add Data' and then click 'Upload'
+2) Click 'Select File' and browse to the output json file.
+3) Click 'Next'.
+4) The Source type should recognize the file as _json but there should be a warning in the table stating it failed to parse the timestamp.
+5) Click the '>' next to Advanced and then click 'New Setting'.
+6) Name it TIME_PREFIX and give it the value '\\/Date\(' (without the quotes). Click Apply Settings.
+7) Scroll the frame back up and click 'Save As'. Name the Source Type 'CriticalWinEvents_json' and click 'Save'.
+8) Click Next. Set the Input Settings for host and index based on where you retrieved the event logs and what index you want to use.
+9) Click Review. Click Submit.
+10) The data should now be available for searching." | out-file $OutputReadme
+
 
