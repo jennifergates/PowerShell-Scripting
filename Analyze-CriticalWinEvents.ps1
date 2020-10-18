@@ -78,10 +78,11 @@ if ($OutputDirectory[-1] -ne "\") {
 
 #-------------------------------- Variables --------------------------------#
 $TimeRun = get-date -UFormat "%Y%m%dT%H%M"
-$OutputFile = $OutputDirectory + 'CriticalWinEventsAnalysis_' + $TimeRun + ".txt"
+$AnalysisOutputFile = $OutputDirectory + 'CriticalWinEventsAnalysis_' + $TimeRun + ".txt"
+$SuspiciousWordMatchOutputFile = $OutputDirectory + 'SuspiciousWordMatches_' + $TimeRun + ".txt"
 
 $CriticalEvents = import-csv $CriticalEventsFile
-
+$Suspiciouswords = 'whoami','ping','dsquery','dsget','tasklist','quser','cacls','wsmprovhost','psexec','teams'
 
 #------------------------- REGEX Definitions ------------------------------
 [regex]$Fields4624 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AccName>[^\n]*)\n.*\n\s*Logon ID:\s*(?<LogonID>[^\n]*)\s*\n.*\nLogon Information:\s*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*\n.*\n.*\n.*\n.*\n.*\n.*\n.*New Logon:\s*Security ID:\s*(?<NewLogonSecID>[^\n]*)\n\s*Account Name:\s*(?<NewLogonAcctName>[^\n]*)\n\s*Account Domain:\s*(?<NewLogonAcctDom>[^\n]*)\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\n.*\s*Workstation Name:\s*(?<NetInfoWksName>[^\n]*)\s*\n\s*Source Network Address:\s*(?<NetInfoSrcAddr>[^\n]*)\s*\n\s*Source Port:\s*(?<NetInfoSrcPort>[^\n]*)\s*\n\s*\n\s*Detailed Authentication Information:\s*\n\.*\s*.*\n\s*Authentication Package:\s*(?<AuthPkg>[^\n]*).*\s*.*\s*Package Name \(NTLM only\):\s*(?<NTLMPkgName>[^\n]).*"
@@ -90,6 +91,8 @@ $CriticalEvents = import-csv $CriticalEventsFile
 
 <# Faster with split?
 [regex]$Fields10 = ".*Process accessed:\nRuleName: (?<RuleName>[^\n]*)\nUtcTime: (?<UtcTime>[^\n]*)\nSourceProcessGUID: (?<SourceProcessGUID>[^\n]*)\nSourceProcessId: (?<SourceProcessId>[^\n]*)\nSourceThreadId: (?<SourceThreadId>[^\n]*)\nSourceImage: (?<SourceImage>[^\n]*)\nTargetProcessGUID: (?<TargetProcessGUID>[^\n]*)\nTargetProcessId: (?<TargetProcessId>[^\n]*)\nTargetImage: (?<TargetImage>[^\n]*)\nGrantedAccess: (?<GrantedAccess>[^\n]*)\nCallTrace: (?<CallTrace>[^\n]*)" #>
+
+[regex]$SuspiciouswordsRegex = "whoami|ping|dsquery|dsget|tasklist|quser|cacls|wsmprovhost|psexec|teams"
 
 #------------------------- function ------------------------------
 function Get-VarFromRegex {
@@ -126,7 +129,7 @@ function Get-VarFromSplit {
 }
 
 
-#-------------------------------- Main --------------------------------#
+#------------------------ Create Objects from Events with Message field details -----------------------------#
 
 # Read in all files to create one array of all event objects
 write-host "[] Reading in files from $InputDirectory . `nDepending on the number and size of files, this could take a few minutes." -foregroundcolor cyan
@@ -136,6 +139,7 @@ $AllEventFiles = get-childitem $InputDirectory
 $ListOfFileEventLists= foreach ($EventFile in $AllEventFiles){ get-content $EventFile.FullName | convertfrom-json}
 $AllEvents = foreach ($FileEventList in $ListOfFileEventLists) { $FileEventList }
 
+#### SECURITY
 # Get details from Event 4624 Message fields
 $All4624Messages = $AllEvents | where-object -property id -eq 4624 | select-object -property message -expandproperty message
 $All4624Details = foreach ($EventMessage in $All4624Messages ){
@@ -154,54 +158,43 @@ $All4634Details = foreach ($EventMessage in $All4634Messages ){
 	Get-VarFromRegex -EventMessage $EventMessage -VarRegex $Fields4634 -EventID 4634
 }
 
-# Get details from Event 10 Sysmon logs
-$All10Messages = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational" | where-object -property id -eq 10 | select-object -property message -expandproperty message
-$All10Details = foreach ($EventMessage in $All10Messages){
-	Get-VarFromSplit -EventMessage $EventMessage -EventID 10
-}
-<# Faster with split?
-$All10Details = foreach ($EventMessage in $All10Messages) {
-	Get-VarFromRegex -EventMessage $EventMessage -VarRegex $Fields10 -EventID 10
-} #>
-
-# Get details from Event 1 Sysmon logs
-$All1Messages = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational" | where-object -property id -eq 1 | select-object -property message -expandproperty message
-
-$All1Details = foreach ($EventMessage in $All1Messages){
-	Get-VarFromSplit -EventMessage $EventMessage -EventID 1
+#### SYSMON
+# Create collection of new objects for each event where Sysmon message fields are their own properties in the object
+$AllSysmonEvents = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational" | foreach-object { 
+	$NewEvent = $_
+	foreach ($var in ($_.Message -split "`r`n" )) {
+		$NewEvent |  Add-Member -MemberType NoteProperty -Name (('Message_'+$var -split ": ", 2)[0])  -Value ($var -split ": ", 2)[1]
+	}
+	$NewEvent
 }
 
-$AllSysmonMessages = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational"| select-object -property message -expandproperty message
-$AllSysmonDetails = foreach ($EventMessage in $AllSysmonMessages){
-	Get-VarFromSplit -EventMessage $EventMessage -EventID 999
-}
+#------------------------ Use Objects to parse specifics from events -----------------------------#
 
-# Get all hashes reported by Sysmon events and their corresponding file 
-$AllSysmonHashes = $AllSysmonDetails |where-object -property hashes -ne ""  -erroraction silentlycontinue 
-$AllSysmonHashesToFiles= foreach ($hashevent in $AllSysmonHashes) {
-	if (($hashevent.image -ne $null ) -and ($hashevent.imageloaded -ne $null)) {
-		$filehashes = new-Object -TypeName psobject
-		$filehashes | Add-Member -MemberType NoteProperty -Name FileVersion -Value $hashevent.FileVersion
-		if ($hashevent.image -ne $null) {
-			$filehashes | Add-Member -MemberType NoteProperty -Name File -Value $hashevent.image
-		} else {
-			$filehashes | Add-Member -MemberType NoteProperty -Name File -Value $hashevent.imageloaded
-		}
-		foreach ($hash in ($hashevent.hashes -split "," )) {
-			$filehashes | Add-Member -MemberType NoteProperty -Name ($hash -split "=")[0] -Value ($hash -split "=")[1]
+
+# Get all CommandLines reported by Sysmon events  
+$AllSysmonCmdlineEvents = $AllSysmonEvents |where-object {$_.id -eq 1 -and $_.Message_CommandLine -ne $null } -erroraction silentlycontinue 
+
+#$AllSysmonCmdlineEvents | group-object -property Message_Image,Message_CommandLine | format-table Count,@{Label="Message_CommandLine"; Expression={($_.Name -split ",")[1]}} -wrap
+
+
+# look for suspicious words  
+function Find-Suspiciouswords{
+	#Look for Suspicious words in the message field of events 
+	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	"================================== Suspicious Words found in Event Message ==============================="
+	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	"Looking for these Suspicious words: " 
+	$SuspiciouswordsRegex.tostring()
+	Foreach ($Event in $AllEvents) {
+		if (($Event.Message).toLower() -match $SuspiciouswordsRegex) {
+			"`n---------------------------------------------------------------------------------------------------"
+			"Matched words:"
+			$Matches.values
+			"`nEvent Details:"
+			$Event
 		}
 	}
-	$filehashes
 }
-
-
-
-
-
-
-
-# process create has command line. should do one on that.
-
 
 
 write-host "[] Calculating statistics" -foregroundcolor cyan
@@ -234,11 +227,6 @@ function Write-ToFile() {
 	"============================================================================="
 	$AllEvents | Group-Object -Property MachineName | format-table @{Label="MachineName"; Expression={$_.Name}},Count
 	
-<# 	Not so useful.
-	"`n============================================================================="
-	"Number of Events Retrieved by Event Message:"
-	"============================================================================="
-	$AllEvents | Group-Object -Property message | sort-object -Property count -Descending | format-table Count,@{Label="Message"; Expression={$_.Name}} -Autosize #>
 	"`n`n"
 	"`n============================================================================="
 	"Number of Event ID 4624 Events by Logon Type, New Logon Account Name, and Network Info Source Address:"
@@ -275,30 +263,39 @@ function Write-ToFile() {
 	"`n============================================================================="
 	"Number of Event ID 10 (Process Access) Sysmon Events by Target Image with full path"
 	"============================================================================="
-	$All10Details | group-object -property TargetImage | sort-object -Property count -Descending | format-table count,@{Label="TargetImage"; Expression={$_.Name}} -wrap
+	$AllSysmonEvents | where-object -property id -eq 10  | group-object -property Message_TargetImage | sort-object -Property count -Descending | format-table count,@{Label="Message_TargetImage"; Expression={$_.Name}} -wrap
 	
 	"`n============================================================================="
 	"Number of Event ID 10 (Process Access) Sysmon Events by Target Image"
 	"============================================================================="	
-	$All10Details|  foreach-object { ($_.TargetImage -split "\\")[-1] } | group-object | sort-object -property count -Descending | format-table count,@{Label="TargetImage"; Expression={$_.Name}} -wrap
+	$AllSysmonEvents | where-object -property id -eq 10 |foreach-object { ($_.Message_TargetImage -split "\\")[-1] } | group-object | sort-object -property count -Descending | format-table count,@{Label="Message_TargetImage"; Expression={$_.Name}} -wrap
 	
 	"`n============================================================================="
 	"Number of Event ID 1 (Process Create) Sysmon Events where Image name doesn't equal Original File name"
 	"============================================================================="	
-	$All1Details | where-object { ($_.Image -split("\\"))[-1] -ne $_.OriginalFileName} |  group-object Image,OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Image"; Expression={($_.Name -split ",")[0]}},@{Label="OriginalFileName"; Expression={($_.Name -split ",")[1]}} -wrap
+	$AllSysmonEvents | where-object -property id -eq 1 | where-object { ($_.Message_Image -split("\\"))[-1] -ne $_.Message_OriginalFileName} |  group-object Message_Image,Message_OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Message_Image"; Expression={($_.Name -split ",")[0]}},@{Label="Message_OriginalFileName"; Expression={($_.Name -split ",")[1]}} -wrap
 	
 	"`n============================================================================="
-	"MD5 File Hashes reported in Sysmon Events "
+	"File Hashes reported in Sysmon Events "
 	"============================================================================="	
-	$AllSysmonHashesToFiles  | group-object -property file,fileversion,md5 | format-table count,@{Label="File"; Expression={($_.Name -split ",")[0]}},@{Label="FileVersion"; Expression={($_.Name -split ",")[1]}},@{Label="MD5"; Expression={($_.Name -split ",")[2]}} -wrap
+	"-- All files with recorded hashes by Sysmon Event 1 (Process Create Events)" 
+	$AllSysmonEvents | where-object -property id -eq 1 |group-object -property Message_image,Message_FileVersion,Message_hashes | sort-object -property name | format-table count,@{Label="Message_Image"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{	Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
+
+	"-- All files with recorded hashes by Sysmon Event 7 (Image Loaded Events) "
+	$AllSysmonEvents | where-object -property id -eq 7 |group-object -property Message_imageLoaded,Message_FileVersion,Message_hashes | sort-object -property name | format-table count,@{Label="Message_ImageLoaded"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{	Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
+
+	"-- All files with recorded hashes by Sysmon Event 6 (Kernel Driver Loaded Events) "
+	$AllSysmonEvents | where-object -property id -eq 7 |sort-object -property @{Expression={($_.Message_ImageLoaded -split '\\')[-1]}},Message_Hashes -unique | format-table RecordId,@{Label="Message_ImageLoaded"; Expression={($_.Message_ImageLoaded -split '\\')[-1]}},@{Label="Message_Hash"; Expression={($_.Message_Hashes -split ',')[0]}}
 	
 	
-	"Processing Time: "
+	"`n`nProcessing Time: "
 	$(get-date) - $timestart | fl TotalMinutes
 }
 
  
-write-host "[] Writing output to $OutputFile" -foregroundcolor cyan
-Write-ToFile | write-output | out-file $OutputFile -encoding utf8
+write-host "[] Writing Analysis output to $AnalysisOutputFile" -foregroundcolor cyan
+Write-ToFile | write-output | out-file $AnalysisOutputFile -encoding utf8
+write-host "[] Writing Suspicious Word Match output to $SuspiciousWordMatchOutputFile" -foregroundcolor cyan
+Find-Suspiciouswords | write-output | out-file $SuspiciousWordMatchOutputFile -encoding utf8
 
 
