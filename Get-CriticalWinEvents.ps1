@@ -47,10 +47,18 @@
         [Optional] Maximum number of events to return. Default is all events.
 		
 	.Parameter StartTime
-		Specifies the the Start Time to start looking for events.  Specify a string in the format:
+		Specifies the  StartTime to look for events created after a specific date.  
+		Specify a string in the format:
 			"2020-10-18 10:10:10.000Z"
-		Default start time is 1 day before script run time calculated with:
+		Default StartTime is 1 day before script run time calculated with:
 			(get-date) - ((New-TimeSpan -Day 1)
+			
+	.Parameter EndTime
+		Specifies the the End Time to look for events created before a specific date.
+		Specify a string in the format:
+			"2020-10-18 10:10:10.000Z"
+		Default EndTime is script run time calculated with:
+			(get-date)
 		
 	.Parameter CriticalEventsFile
 		Specifies the path to the csv file containing the critical events and their info.
@@ -141,6 +149,8 @@ Param(
 	
 	[string] $StartTime,
 	
+	[string] $EndTime,
+	
 	[array] $ComputerNames = (,"localhost"),
 	
 	[string] $CriticalEventsFile = "CriticalEvents.csv",
@@ -205,12 +215,17 @@ if ($Max -ne 0) {
 	$MaxEvents = ''
 }
 
-if ($StartTime -ne $null){
+if ($StartTime -ne ""){
 	$StartDateTime = (Get-Date $StartTime)
 } else {
 	$StartDateTime = (Get-date) - (New-TimeSpan -Day 1)
-}	
+}
 
+if ($EndTime -ne ""){
+	$EndDateTime = (Get-Date $EndTime)
+} else {
+	$EndDateTime = Get-date
+}	
 
 <#   Still need to incorporate or address if remote computers will be accessed
 $cred = get-credential
@@ -253,7 +268,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		$CritInfo = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid,description 
 		
 		write-host ""
-		write-host "[] Retrieving critical events in $LogFile log ($LogName) starting at $StartDateTime." -foregroundcolor Cyan
+		write-host "[] Retrieving critical events in $LogFile log ($LogName) starting at $StartDateTime and ending at $EndDateTime." -foregroundcolor Cyan
 		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
 		$CritInfo | ft eventid,description -wrap
 		
@@ -263,7 +278,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		foreach ($ComputerName in $ComputerNames) {
 			write-host "[] Retrieving events from $ComputerName." -foregroundcolor Cyan
 			try {
-				$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id; StartTime=$StartDateTime;} @MaxEvents -ErrorAction stop | foreach-object { $_ | convertto-json  }
+				$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$LogName; ID=$id; StartTime=$StartDateTime; EndTime = $EndDateTime;} @MaxEvents -ErrorAction stop | foreach-object { $_ | convertto-json  }
 				# join each object's json with a comma as a list/array of json objects and add to output string
 				$jsonOutput += [string]::join(",",$jsonEvents)
 				# need a trailing , between json object lists for each logfile in a specific category.
@@ -290,7 +305,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		$CritInfo = $CatEvents | select-object -property eventid,description
 		
 		write-host ""
-		write-host "[] Retrieving critical events in $category starting at $StartDateTime." -foregroundcolor Cyan
+		write-host "[] Retrieving critical events in $category starting at $StartDateTime and ending at $EndDateTime." -foregroundcolor Cyan
 		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
 		$CritInfo | ft eventid,description -wrap
 		
@@ -302,7 +317,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 			foreach ($CatLogFile in $CatLogFiles) {
 				$id = $CatEvents | where-object -property LogFilefull -eq $CatLogFile | select-object -property eventid -expandproperty eventid 
 				try {
-					$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id; StartTime=$StartDateTime;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json } 
+					$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id; StartTime=$StartDateTime; EndTime = $EndDateTime;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json } 
 					
 					# join each object's json with a comma as a list/array of json objects and add to output string
 					$jsonOutput += [string]::join(",",$jsonEvents)
