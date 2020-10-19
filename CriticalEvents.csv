@@ -126,7 +126,7 @@ EventID,Category,Description,LogfileFull,LogfileShort
 20003,DriverManagement,Driver Mmgt device instance service installation,System,System
 24576,DriverManagement,Drivers successfully installed for device.,System,System
 10,SysmonSecurity,Process accessed,Microsoft-Windows-Sysmon/Operational,Sysmon
-12,SysmonSecurity,Registry Object create and delete,Microsoft-Windows-Sysmon/Operational
+12,SysmonSecurity,Registry Object create and delete,Microsoft-Windows-Sysmon/Operational,Sysmon
 14,SysmonSecurity,Registry Key and Value Rename,Microsoft-Windows-Sysmon/Operational,Sysmon
 15,SysmonSecurity,File Create Stream Hash,Microsoft-Windows-Sysmon/Operational,Sysmon
 16,SysmonSecurity,Sysmon Config Change,Microsoft-Windows-Sysmon/Operational,Sysmon

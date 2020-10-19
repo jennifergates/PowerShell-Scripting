@@ -106,7 +106,7 @@ $CriticalEvents = import-csv $CriticalEventsFile
 
 [regex]$Fields4634 = ".*Subject:\s*\n\s*Security ID:\s*(?<SecID>[^\n]*)\s*\n\s*Account Name:\s*(?<AccName>[^\n]*)\n.*\n\s*Logon ID:\s*(?<LogonID>[^\n]*)\s*\n.*\n\s*Logon Type:\s*(?<LogonType>[0-9]+).*"
 
-
+[regex]$SuspiciousRegNames = "Run|Shell|Scripts|UserInit|UserAssist"
 
 
 #------------------------- functions --------------------------------------#
@@ -186,7 +186,6 @@ $AllSysmonEvents = $AllEvents | where-object -property logname -eq "Microsoft-Wi
 
 
 
-# Get all registry key run key sysmon 12 events
 
 # look for suspicious words  
 function Find-Suspiciouswords{
@@ -297,6 +296,11 @@ function Get-SummaryAnalysis {
 	"============================================================================="	
 	$AllSysmonEvents | where-object -property id -eq 1 | where-object { ($_.Message_Image -split("\\"))[-1] -ne $_.Message_OriginalFileName} |  group-object Message_Image,Message_OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Message_Image"; Expression={($_.Name -split ",")[0]}},@{Label="Message_OriginalFileName"; Expression={($_.Name -split ",")[1]}} -wrap
 	
+	"`n============================================================================="
+	"Sysmon Registry Events containing key words in the registry path"
+	"Key words: $SuspiciousRegNames"
+	"============================================================================="	
+	$AllSysmonEvents | where-object {($_.id -eq 12 -or $_.id -eq 13 -or $_.id -eq 14)-and $_.Message_TargetObject -match $SuspiciousRegNames } | format-table Message_utcTime,Message_Image,Message_EventType,Message_TargetObject
 
 }
 
