@@ -186,7 +186,23 @@ function Get-LogonTypeDesc{
 	
 }
 
+function Check-ParentChild{
+	[CmdletBinding()]
+	param (
+		[parameter(ValueFromPipeline =  $true)]
+		$Event1Obj
+	)
+	Begin {
+		$parents= "winword.exe","excel.exe","powerpoint.exe","mspub.exe","outlook.exe","visio.exe","powershell.exe","teams.exe"
+		$children= "jsc.exe","csc.exe","cmd.exe","msbuild.exe","powershell.exe"
+	}
+	Process {
+		if ( ($parents | foreach-object {$Event1Obj.Message_ParentCommandLine.tolower().contains($_)}) -contains $true    -and    ($children | foreach-object {$Event1Obj.Message_CommandLine.tolower().contains($_)}) -contains $true ) {
+			$Event1Obj
+		}
+	}
 
+}
 #------------------------ Create Objects from Events with Message field details -----------------------------#
 
 # Read in all files to create one array of all event objects
@@ -233,13 +249,15 @@ $AllSysmonEvents = $AllEvents | where-object -property logname -eq "Microsoft-Wi
 	$NewEvent
 }
 
+####################+++++++++++++++++++TESTING AREA ++++++++++++++++++++++++##############
+
+#$AllEvents | where-object {($_.id -eq 104 -and $_.logname -eq "System") -or ($_.id -eq 1102 -and $_.logname -eq "Security")} | format-list *
+
+#$AllSysmonEvents | where-object -property id -eq 1 | gm
+
+####################+++++++++++++++++++TESTING AREA ++++++++++++++++++++++++##############
+
 #------------------------ Use Objects to parse specifics from events -----------------------------#
-
-$AllEvents | where-object {($_.id -eq 104 -and $_.logname -eq "System") -or ($_.id -eq 1102 -and $_.logname -eq "Security")} | format-list *
-
-#$AllSecurityEvents | where-object -property id -eq 4634 | gm
-
-
 write-host "[] Calculating statistics" -foregroundcolor cyan
 
 function Get-SummaryAnalysis {
@@ -247,7 +265,7 @@ function Get-SummaryAnalysis {
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"======================== Critical Windows Events Summary Analysis ==================="
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-	"`n Script Run Time: $TimeRun"
+	"`nScript Run Time: $TimeRun"
 
 	"`n`n=========================================================================================="
 	"The following files were analyzed: "
@@ -275,7 +293,7 @@ function Get-LogonAnalysis{
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"======================== Critical Windows Events Logon Events Analysis ==================="
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-	"`n Script Run Time: $TimeRun"
+	"`nScript Run Time: $TimeRun"
 	"`n`n"
 	"`n=========================================================================================="
 	"Number of Event ID 4624 Events by Logon Type, New Logon Account Name, and Network "
@@ -316,27 +334,34 @@ function Get-SysmonAnalysis{
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"======================== Critical Windows Events Sysmon Analysis ==================="
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-	"`n Script Run Time: $TimeRun"
-	"`n=========================================================================================="
-	"Number of Event ID 10 (Process Access) Sysmon Events by Target Image with full path"
-	"=========================================================================================="
-	$AllSysmonEvents | where-object -property id -eq 10  | group-object -property Message_TargetImage | sort-object -Property count -Descending | format-table count,@{Label="Message_TargetImage"; Expression={$_.Name}} -wrap
-	
+	"`nScript Run Time: $TimeRun"
 	"`n=========================================================================================="
 	"Number of Event ID 10 (Process Access) Sysmon Events by Target Image"
-	"=========================================================================================="	
-	$AllSysmonEvents | where-object -property id -eq 10 |foreach-object { ($_.Message_TargetImage -split "\\")[-1] } | group-object | sort-object -property count -Descending | format-table count,@{Label="Message_TargetImage"; Expression={$_.Name}} -wrap
+	"=========================================================================================="
+	$AllSysmonEvents | where-object -property id -eq 10  | group-object -property Message_TargetImage | sort-object -Property @{Expression = {$_.count}; Ascending = $false},name  |format-table count,@{Label="Message_TargetImage"; Expression={$_.Name}} -wrap
+
+	"`n=========================================================================================="
+	"Number of Event ID 1 (Process Create) Sysmon Events by Image"
+	"=========================================================================================="
+	$AllSysmonEvents | where-object -property id -eq 1  | group-object -property Message_Image | sort-object -Property @{Expression = {$_.count}; Ascending = $false},name  |format-table count,@{Label="Message_Image"; Expression={$_.Name}} -wrap
 	
 	"`n=========================================================================================="
 	"Number of Event ID 1 (Process Create) Sysmon Events where Image name doesn't equal Original File name"
 	"=========================================================================================="	
-	$AllSysmonEvents | where-object -property id -eq 1 | where-object { ($_.Message_Image -split("\\"))[-1] -ne $_.Message_OriginalFileName} |  group-object Message_Image,Message_OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Message_Image"; Expression={($_.Name -split ",")[0]}},@{Label="Message_OriginalFileName"; Expression={($_.Name -split ",")[1]}} -wrap
+	$AllSysmonEvents | where-object -property id -eq 1 | where-object { ($_.Message_Image -split("\\"))[-1] -ne $_.Message_OriginalFileName -and $_.Message_OriginalFileName -ne "?"} |  group-object Message_Image,Message_OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Message_OriginalFileName"; Expression={($_.Name -split ",")[1]}},@{Label="Message_Image"; Expression={($_.Name -split ",")[0]}} -wrap
 	
 	"`n=========================================================================================="
 	"Sysmon Registry Events containing key words in the registry path"
 	"Key words: $SuspiciousRegNames"
 	"=========================================================================================="	
-	$AllSysmonEvents | where-object {($_.id -eq 12 -or $_.id -eq 13 -or $_.id -eq 14)-and $_.Message_TargetObject -match $SuspiciousRegNames } | format-table Message_utcTime,Message_Image,Message_EventType,Message_TargetObject
+	$AllSysmonEvents | where-object {($_.id -eq 12 -or $_.id -eq 13 -or $_.id -eq 14) -and $_.Message_TargetObject -match $SuspiciousRegNames } | format-table Message_utcTime,Message_Image,Message_EventType,Message_TargetObject -wrap
+		
+	"`n=========================================================================================="
+	"Sysmon Event ID 1 (Process Create) Events where the Parent Commandline contains winword.exe, "
+	"excel.exe, powerpoint.exe, mspub.exe, outlook.exe, visio.exe, or powershell.exe and the created "
+	"process commandline contains jsc.exe, csc.exe, cmd.exe, powershell.exe, or msbuild.exe"
+	"=========================================================================================="
+	$AllSysmonEvents | where-object {$_.id -eq 1 } | Check-ParentChild | format-list Message_ParentCommandLine,Message_CommandLine
 
 }
 
@@ -375,7 +400,7 @@ function Get-Commandlines {
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"`n Script Run Time: $TimeRun"
 	"---------------------------------------------------------------------------------------------------"
-	"-- All Command Lines recorded by Sysmon Event 1 (Process Create Events)" 
+	"-- All Command Lines recorded by Sysmon Event 1 (Process Create Events), grouped by image" 
 	"---------------------------------------------------------------------------------------------------" 
 	$AllSysmonEvents |where-object {$_.id -eq 1 -and $_.Message_CommandLine -ne $null } |sort-object -property Message_Image | format-list Message_Image,Message_User,Message_LogonID,Message_ParentCommandLine,Message_CommandLine -groupby Message_image 
 }
@@ -388,7 +413,7 @@ function Get-FileHashes {
 	"---------------------------------------------------------------------------------------------------"
 	"-- All files with recorded hashes by Sysmon Event 1 (Process Create Events) - Quick View" 
 	"---------------------------------------------------------------------------------------------------"
-	$AllSysmonEvents | where-object -property id -eq 1 |group-object -property Message_image,Message_FileVersion,Message_hashes | sort-object -property name | format-table count,@{Label="Message_Image"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{	Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
+	$AllSysmonEvents | where-object -property id -eq 1 |group-object -property Message_image,Message_FileVersion,Message_hashes | sort-object -property count -Descending | format-table count,@{Label="Message_Image"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{	Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
 
 	"---------------------------------------------------------------------------------------------------"
 	"-- All files with recorded hashes by Sysmon Event 1 (Process Create Events) - Detailed View"
@@ -398,7 +423,7 @@ function Get-FileHashes {
 	"---------------------------------------------------------------------------------------------------"
 	"-- All files with recorded hashes by Sysmon Event 7 (Image Loaded Events) - Quick View"
 	"---------------------------------------------------------------------------------------------------"
-	$AllSysmonEvents | where-object -property id -eq 7 |group-object -property Message_imageLoaded,Message_FileVersion,Message_hashes | sort-object -property name | format-table count,@{Label="Message_ImageLoaded"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
+	$AllSysmonEvents | where-object -property id -eq 7 |group-object -property Message_imageLoaded,Message_FileVersion,Message_hashes | sort-object -property count -Descending | format-table count,@{Label="Message_ImageLoaded"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
 	
 	"---------------------------------------------------------------------------------------------------"
 	"-- All files with recorded hashes by Sysmon Event 7 (Image Loaded Events) - Detailed View"
@@ -408,7 +433,7 @@ function Get-FileHashes {
 	"---------------------------------------------------------------------------------------------------"
 	"-- All files with recorded hashes by Sysmon Event 6 (Kernel Driver Loaded Events) - Quick View "
 	"---------------------------------------------------------------------------------------------------"
-	$AllSysmonEvents | where-object -property id -eq 6 |group-object -property Message_imageLoaded,Message_FileVersion,Message_hashes | sort-object -property name | format-table count,@{Label="Message_ImageLoaded"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
+	$AllSysmonEvents | where-object -property id -eq 6 |group-object -property Message_imageLoaded,Message_FileVersion,Message_hashes | sort-object -property count -Descending | format-table count,@{Label="Message_ImageLoaded"; Expression={(($_.Name -split ',')[0] -split '\\')[-1]}},@{Label="Message_FileVersion"; Expression={($_.Name -split ',')[1]}},@{Label="Message_Hash"; Expression={($_.Name -split ',')[2]}}
 	
 	"---------------------------------------------------------------------------------------------------"
 	"-- All files with recorded hashes by Sysmon Event 6 (Kernel Driver Loaded Events) - Detailed View" 
