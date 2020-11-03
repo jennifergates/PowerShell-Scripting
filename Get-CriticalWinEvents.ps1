@@ -111,6 +111,9 @@
 			WLANAutoConfig
 			AppLockerEXEandDLL
 			NetworkProfile
+			
+	.Parameter EvtxFile
+		Specifies the path to retrieve all critical events from a Windows Event file (.evtx).
 		
 	.Parameter OutputDir
 		Specifies the directory to save output files.
@@ -118,11 +121,11 @@
     .Notes
         NAME: ./Get-CriticalWinEvents.ps1
         AUTHOR: Jennifer Gates
-        VERSION: 1.00
+        VERSION: 1.10
         LASTEDIT: 8 OCT 2020
         CHANGELOG:
             1.00 - initial script 
-    
+			1.1  - additional functionality Evtx file
         Output Colors:
         Cyan - Informational
         Yellow - Warning
@@ -168,7 +171,12 @@ Param(
 		Mandatory = $true
 	)]
 	[ValidateSet('All','Application','Setup','Sysmon','System','WindowsUpdateClient','PrintService','KernelPnPDeviceConfiguration','ProgramInventory','WindowsDefender','Security','WindowsFirewall','CodeIntegrity','WLANAutoConfig','AppLockerEXEandDLL','NetworkProfile')]
-	[array] $LogFiles 
+	[array] $LogFiles, 
+	
+	[Parameter(
+		ParameterSetName='evtxFile'
+	)]
+	[string] $EvtxFile
 	
 )
 
@@ -190,6 +198,12 @@ if (-not (test-path $OutputDir)) {
 # ensure critical events file exists
 if (-not (test-path $CriticalEventsFile)) {
 	write-host "$CriticalEventsFile does not exist. Please run again with a valid Critical Events file." -foregroundcolor Red
+	exit
+}
+
+# if an events file path is specified, make sure it is valid
+if ($EvtxFile -and (-not (test-path $EvtxFile))) {
+	write-host "$EvtxFile does not exist. Please run again with a valid path for the evtx file" -foregroundcolor Red
 	exit
 }
 
@@ -226,6 +240,11 @@ if ($EndTime -ne ""){
 } else {
 	$EndDateTime = Get-date
 }	
+
+if ($EvtxFile -ne ""){
+	$EvtxBasename = get-childitem $EvtxFile | foreach-object {$_.Basename}
+	$EvtxFile = resolve-path $EvtxFile
+}
 
 <#   Still need to incorporate or address if remote computers will be accessed
 $cred = get-credential
@@ -266,7 +285,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		$LogName = ($CriticalEvents | where-object -property LogFileshort -eq $LogFile   | select-object -property LogFilefull -first 1).LogFilefull
 		$id = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid -expandproperty eventid 
 		$CritInfo = $CriticalEvents | where-object -property LogFileshort -eq $LogFile  | select-object -property eventid,description 
-		
+		#$id.length
 		write-host ""
 		write-host "[] Retrieving critical events in $LogFile log ($LogName) starting at $StartDateTime and ending at $EndDateTime." -foregroundcolor Cyan
 		write-host "Looking for these Critical Events:" -foregroundcolor Cyan
@@ -297,7 +316,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 	
 	
 # Retrieving Critical Events from specified categories
-} else {
+} elseif ($PSCmdlet.ParameterSetName -eq 'bycategory') {
 	foreach ($category in $Categories) {
 		$OutputFile = $OutputDir + $category + '_' + $TimeRun  + '_events.json'
 		$CatEvents = $CriticalEvents | where-object -property category -eq $category
@@ -316,6 +335,7 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 			write-host "[] Retrieving events from $ComputerName." -foregroundcolor Cyan
 			foreach ($CatLogFile in $CatLogFiles) {
 				$id = $CatEvents | where-object -property LogFilefull -eq $CatLogFile | select-object -property eventid -expandproperty eventid 
+				#$id.length
 				try {
 					$jsonEvents = Get-Winevent -ComputerName $ComputerName -filterhashtable @{LogName=$CatLogFile; ID=$id; StartTime=$StartDateTime; EndTime = $EndDateTime;} @MaxEvents -ErrorAction stop | foreach-object {$_ | ConvertTo-Json } 
 					
@@ -336,6 +356,40 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 		Write-ToJsonFile -outfile $OutputFile -text $jsonOutput
 
 	}	
+} else {
+	$OutputFile = $OutputDir + $EvtxBasename + '_' + $TimeRun + '_events.json'
+	$FileEventsIds = $CriticalEvents | select-object -property eventid -expandproperty eventid | sort-object -Unique
+	write-host ""
+	write-host "[] Retrieving all critical events in $EvtxFile." -foregroundcolor Cyan
+
+	# create variable to hold string output to write to file and start it with "["
+	$jsonOutput = "["
+	
+	# filterhashtable seems to have a max of 23 items for the ID values so need to loop
+	$start =0
+	$end = 20
+	
+	while ($end -lt $FileEventsIds.length){
+	
+		try {
+			$jsonEvents = Get-Winevent -filterhashtable @{ Path=$EvtxFile; ID=$FileEventsIds[$start..$end]; } -ErrorAction stop | foreach-object {$_ | convertto-json}
+			# join each object's json with a comma as a list/array of json objects and add to output string
+			$jsonOutput += [string]::join(",",$jsonEvents)
+			# need a trailing , between json object lists for each logfile in a specific category.
+			$jsonOutput += ','
+
+		} catch {
+			if ($_.Exception.Message -eq "No events were found that match the specified selection criteria." ) { 
+				write-host "No Critical Events with IDs $($FileEventsIds[$start..$end]) found in $EvtxFile.`n" -foregroundcolor Yellow
+			}
+		}
+		
+		$start = $start +20
+		$end = $end +20
+
+	}
+	
+	Write-ToJsonFile -outfile $OutputFile -text $jsonOutput
 }
 
 # Create Readme to describe importing into splunk
@@ -354,5 +408,4 @@ write-host "To get summary data and run a hasty analysis, run the Analyze-Critic
 8) Click Next. Set the Input Settings for host and index based on where you retrieved the event logs and what index you want to use.
 9) Click Review. Click Submit.
 10) The data should now be available for searching." | out-file $OutputReadme
-
 
