@@ -26,8 +26,10 @@
 		looks for the file named CriticalEvents.csv located in the same directory. 
 		
 	.Parameter SuspiciousWordsFile
-		Optional. Specifies a txt file that contains suspicious words, one per line, to search for in the 
-		event message field.
+		Optional. Specifies a txt file that contains suspicious words, one per line, to search for in the event message field.
+		
+	.Parameter SuspiciousRegexFile
+		Optional. Specifies a txt file that contains suspicious regular expressions, one per line, to search for in the sysmon detected commandlines.
 		
 	.Parameter CmdLineWhitelistFile
 		Optional. Specifies a text file that contains whitelisted command lines. Full or partial, one per line.
@@ -65,7 +67,9 @@ Param(
 	
 	[string] $CriticalEventsFile = "CriticalEvents.csv",
 	
-	[string] $SuspiciousWordsFile = "SuspiciousWords.txt",
+	[string] $SuspiciousWordsFile,
+	
+	[string] $SuspiciousRegexFile,
 	
 	[string] $CmdLineWhitelistFile,
 	
@@ -92,6 +96,12 @@ if (-not (test-path $InputDirectory)) {
 # ensure suspicious words file exists, if provided
 if ($SuspiciousWordsFile -and (-not (test-path $SuspiciousWordsFile))) {
 	write-host "$SuspiciousWordsFile does not exist. Please run again with a valid suspicious word file." -foregroundcolor Red
+	exit
+}
+
+# ensure suspicious regex file exists, if provided
+if ($SuspiciousRegexFile -and (-not (test-path $SuspiciousRegexFile))) {
+	write-host "$SuspiciousRegexFile does not exist. Please run again with a valid suspicious regex file." -foregroundcolor Red
 	exit
 }
 
@@ -127,6 +137,7 @@ $SuspiciousWordMatchOutputFile = $OutputDirectory + 'SuspiciousWordMatches_' + $
 $FileHashesOutputFile = $OutputDirectory + 'SysmonRecordedFileHashes_' + $TimeRun + ".txt"
 $CmdlineOutputFile = $OutputDirectory + 'SysmonProcessCreateCmdLines_' + $TimeRun + ".txt"
 $AdditionalAnalysisOutputFile = $OutputDirectory + 'AdditionalAnalysis_' + $TimeRun + ".txt"
+$CmdlineAnalysisOutputFile = $OutputDirectory + 'SysmonProcessCreateCmdLineAnalysis_' + $TimeRun + ".txt"
 
 $CriticalEvents = import-csv $CriticalEventsFile
 
@@ -374,7 +385,8 @@ function Get-SysmonAnalysis{
 	$AllSysmonEvents | where-object -property id -eq 1  | group-object -property Message_Image | sort-object -Property @{Expression = {$_.count}; Ascending = $false},name  |format-table count,@{Label="Message_Image"; Expression={$_.Name}} -wrap
 	
 	"`n=========================================================================================="
-	"Number of Event ID 1 (Process Create) Sysmon Events where Image name doesn't equal Original File name"
+	"Number of Event ID 1 (Process Create) Sysmon Events where Image name doesn't equal "
+	"Original File name"
 	"=========================================================================================="	
 	$AllSysmonEvents | where-object -property id -eq 1 | where-object { ($_.Message_Image -split("\\"))[-1] -ne $_.Message_OriginalFileName -and $_.Message_OriginalFileName -ne "?"} |  group-object Message_Image,Message_OriginalFileName | sort-object -property count -Descending | format-table count,@{Label="Message_OriginalFileName"; Expression={($_.Name -split ",")[1]}},@{Label="Message_Image"; Expression={($_.Name -split ",")[0]}} -wrap
 	
@@ -401,27 +413,78 @@ function Find-Suspiciouswords{
 	"`n Script Run Time: $TimeRun"
 	if ($SuspiciousWordsFile){
 		$SuspiciouswordsRegex = Get-RegexFromWords -file $SuspiciousWordsFile -Separator '|'
-	} else {
-		[regex]$SuspiciouswordsRegex = '.^'
-	}
-	
-	"#### Looking for these Suspicious words: " 
-	"#### " + $SuspiciouswordsRegex.tostring()
-	"######################################################"
+		"#### Looking for these Suspicious words: " 
+		"#### " + $SuspiciouswordsRegex.tostring()
+		"######################################################"
 
-	Foreach ($Event in $AllEvents) {
-		if ($Event.Message) {
-			if ( ($Event.Message).toLower() -match $SuspiciouswordsRegex) {
-				"`n---------------------------------------------------------------------------------------------------"
-				"######################################################"
-				"#### Matched words:"
-				"#### "+ $Matches.values
-				"######################################################"
-				"`nEvent Details:"
-				$Event
+		Foreach ($Event in $AllEvents) {
+			if ($Event.Message) {
+				if ( ($Event.Message).toLower() -match $SuspiciouswordsRegex) {
+					"`n---------------------------------------------------------------------------------------------------"
+					"######################################################"
+					"#### Matched words:"
+					"#### "+ $Matches.values
+					"######################################################"
+					"`nEvent Details:"
+					$Event
+				}
 			}
 		}
+	
+	} else {
+		"`n`nNo Suspicious Words file provided"
 	}
+	
+
+}
+
+function Get-CommandlineAnalysis {
+	param (
+		$AllID1s
+	)	
+	
+	if ($CmdLineWhitelistFile ) {
+		$CmdLineWhitelist = Get-RegexFromWords -file $CmdLineWhitelistFile -Separator "|"
+	} else {
+		$CmdLineWhitelist = '.^'
+	}
+	
+
+	"`n`n---------------------------------------------------------------------------------------------------"
+	"-- All Command Lines recorded by Sysmon Event 1 by length in groups of 100, excludes Command Line  "
+	"whitelist file entries"
+	"---------------------------------------------------------------------------------------------------" 	
+	
+	#$AllID1 | where-object {$_.Message_CommandLine -notmatch $CmdLineWhitelist } | group-object -property Message_CommandLine | sort-object {($_.Name).length} -Descending | format-table @{Label="CommandLine Length"; Expression={($_.Name).length}},count
+	
+	$AllID1 | where-object {$_.Message_CommandLine -notmatch $CmdLineWhitelist } | group-object -property {[Int][Math]::Floor($_.Message_CommandLine.length / 100)} |sort-object -property name | ft @{Label="Start"; Expression={([int]$_.Name * 100)}},@{Label="End"; Expression={([int]$_.Name * 100 + 99)}},count 
+
+	"`n`n---------------------------------------------------------------------------------------------------"
+	"-- All Command Lines recorded by Sysmon Event 1 that match provided Suspicious "
+	"Regular Expressions"
+	"---------------------------------------------------------------------------------------------------" 	
+	if ($SuspiciousRegexFile) {
+		$SuspiciousRegex = (Get-content $SuspiciousRegexFile).split("`n")
+		Foreach ($Event in $AllID1) {
+			Foreach ($regex in $SuspiciousRegex){
+				if ($Event.Message_CommandLine -match $regex) {
+					$Event.Message_CommandLine
+				}
+			}
+		} 	
+	} else {
+		"`nNo Suspicious Regular Expressions provided"
+	}
+	"`n`n---------------------------------------------------------------------------------------------------"
+	"-- All Command Lines recorded by Sysmon Event 1 that are longer than 1000 characters, excludes"
+	"   Command Line whitelist file entries"
+	"---------------------------------------------------------------------------------------------------" 
+	Foreach ($Event in $AllID1) {
+		if (($Event.Message_CommandLine).length -gt 1000 -and $Event.Message_CommandLine -notmatch $CmdLineWhitelist ) {
+			$Event.Message_CommandLine
+		}
+	}
+	
 }
 
 function Get-Commandlines {
@@ -430,35 +493,11 @@ function Get-Commandlines {
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"`n Script Run Time: $TimeRun"
 	
-	if ($CmdLineWhitelistFile ) {
-		$CmdLineWhitelist = Get-RegexFromWords -file $CmdLineWhitelistFile -Separator "|"
-	} else {
-		$CmdLineWhitelist = '.^'
-	}
 
-	
-	
-	"`n`n---------------------------------------------------------------------------------------------------"
-	"-- All Command Lines recorded by Sysmon Event 1 by length in groups of 100, excludes Command Line whitelist "
-	"file entries"
-	"---------------------------------------------------------------------------------------------------" 	
+
 	$AllID1 = $AllSysmonEvents | where-object {$_.id -eq 1 -and $_.Message_CommandLine -ne $null } 
-	
-	#$AllID1 | where-object {$_.Message_CommandLine -notmatch $CmdLineWhitelist } | group-object -property Message_CommandLine | sort-object {($_.Name).length} -Descending | format-table @{Label="CommandLine Length"; Expression={($_.Name).length}},count
-	
-	$AllID1 | where-object {$_.Message_CommandLine -notmatch $CmdLineWhitelist } | group-object -property {[Int][Math]::Floor($_.Message_CommandLine.length / 100)} |sort-object -property name | ft @{Label="Start"; Expression={([int]$_.Name * 100)}},@{Label="End"; Expression={([int]$_.Name * 100 + 99)}},count 
 
-	
-	"`n`n---------------------------------------------------------------------------------------------------"
-	"-- All Command Lines recorded by Sysmon Event 1 that are longer than 1000 characters, excludes"
-	"   Command Line whitelist file entries"
-	"---------------------------------------------------------------------------------------------------" 
-	Foreach ($Event in $AllID1) {
-		if (($Event.Message_CommandLine).length -gt 1000 -and $Event.Message_CommandLine -notmatch $CmdLineWhitelist ) {
-			$Event.ID
-			$Event.Message_CommandLine
-		}
-	}
+	Get-CommandlineAnalysis($AllID1) | write-output | out-file $CmdlineAnalysisOutputFile -encoding utf8
 	
 	
 	"`n`n---------------------------------------------------------------------------------------------------"
