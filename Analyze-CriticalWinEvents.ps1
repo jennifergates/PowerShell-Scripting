@@ -26,9 +26,12 @@
 		looks for the file named CriticalEvents.csv located in the same directory. 
 		
 	.Parameter SuspiciousWordsFile
-		Specifies a csv file that contains suspicious words to search for in the event message field.
-		Defaults to the following words if no file is provided: 
-		'whoami','ping','dsquery','dsget','tasklist','quser','cacls','wsmprovhost','psexec','jsc','csc','msbuild'
+		Optional. Specifies a txt file that contains suspicious words, one per line, to search for in the 
+		event message field.
+		
+	.Parameter CmdLineWhitelistFile
+		Optional. Specifies a text file that contains whitelisted command lines. Full or partial, one per line.
+		Ex. C:\Users\D-o\AppData\Local\Microsoft\Teams\current\Teams.exe
 		
 	.Parameter OutputDirectory
 		Specifies the path to write the analysis files. The default is the current directory.
@@ -62,7 +65,9 @@ Param(
 	
 	[string] $CriticalEventsFile = "CriticalEvents.csv",
 	
-	[string] $SuspicousWordsFile = "SuspiciousWords.csv",
+	[string] $SuspiciousWordsFile = "SuspiciousWords.txt",
+	
+	[string] $CmdLineWhitelistFile,
 	
 	[string] $OutputDirectory = "."
 	
@@ -86,7 +91,13 @@ if (-not (test-path $InputDirectory)) {
 
 # ensure suspicious words file exists, if provided
 if ($SuspiciousWordsFile -and (-not (test-path $SuspiciousWordsFile))) {
-	write-host "$SuspiciousWordsFile does not exist. Please run again with a valid input directory." -foregroundcolor Red
+	write-host "$SuspiciousWordsFile does not exist. Please run again with a valid suspicious word file." -foregroundcolor Red
+	exit
+}
+
+#ensure process white lsit file exists, if provided	
+if ($CmdLineWhitelistFile -and (-not (test-path $CmdLineWhitelistFile))) {
+	write-host "$CmdLineWhitelistFile does not exist. Please run again with a valid Command Line Whitelist file." -foregroundcolor Red
 	exit
 }
 
@@ -115,8 +126,10 @@ $SysmonAnalysisOutputFile = $OutputDirectory + 'SysmonAnalysis_' + $TimeRun + ".
 $SuspiciousWordMatchOutputFile = $OutputDirectory + 'SuspiciousWordMatches_' + $TimeRun + ".txt"
 $FileHashesOutputFile = $OutputDirectory + 'SysmonRecordedFileHashes_' + $TimeRun + ".txt"
 $CmdlineOutputFile = $OutputDirectory + 'SysmonProcessCreateCmdLines_' + $TimeRun + ".txt"
+$AdditionalAnalysisOutputFile = $OutputDirectory + 'AdditionalAnalysis_' + $TimeRun + ".txt"
 
 $CriticalEvents = import-csv $CriticalEventsFile
+
 
 
 #------------------------- REGEX Definitions ------------------------------#
@@ -128,13 +141,13 @@ $CriticalEvents = import-csv $CriticalEventsFile
 
 function Get-RegexFromWords {
 	param (
-		$File
+		$File,
+		$Separator
 	)
 	$s = ""
 	foreach ($line in (Get-content $File)) {
 			
-		$s = $s + $line.replace(',', '|').replace('/', '\/').replace('.', '\.').replace('(','\(').replace(')', '\)')
-		$s = $s + '|'
+		$s = $s + $line.replace('\','\\').replace('/', '\/').replace('.', '\.').replace('(','\(').replace(')', '\)') + $Separator
 	}
 	$s  = $s -replace '.$'
 	[regex]$s
@@ -193,7 +206,7 @@ function Check-ParentChild{
 		$Event1Obj
 	)
 	Begin {
-		$parents= "winword.exe","excel.exe","powerpoint.exe","mspub.exe","outlook.exe","visio.exe","powershell.exe","teams.exe"
+		$parents= "winword.exe","excel.exe","powerpoint.exe","mspub.exe","outlook.exe","visio.exe","powershell.exe","teams.exe","iexplore.exe","chrome.exe","firefox.exe"
 		$children= "jsc.exe","csc.exe","cmd.exe","msbuild.exe","powershell.exe"
 	}
 	Process {
@@ -240,7 +253,7 @@ $AllSecurityEvents = $AllEvents | where-object -property logname -eq "Security" 
 
 
 #### SYSMON EVENTS
-# Create collection of new objects for each event where Sysmon message fields are their own properties in the object
+# Create collection of new objects for each event putting Sysmon message fields as their own properties in the object
 $AllSysmonEvents = $AllEvents | where-object -property logname -eq "Microsoft-Windows-Sysmon/Operational" | foreach-object { 
 	$NewEvent = $_
 	foreach ($var in ($_.Message -split "`r`n" )) {
@@ -250,8 +263,8 @@ $AllSysmonEvents = $AllEvents | where-object -property logname -eq "Microsoft-Wi
 }
 
 ####################+++++++++++++++++++TESTING AREA ++++++++++++++++++++++++##############
+#$AllEvents | where-object {($_.id -eq 104 -and $_.logname -eq "System") -or ($_.id -eq 1102 -and $_.logname -eq "Security")} | format-list Subject_Account_Name,Subject_Domain_Name,Subject_Logon_ID,TimeCreated,LogName,Id,UserID,Properties
 
-#$AllEvents | where-object {($_.id -eq 104 -and $_.logname -eq "System") -or ($_.id -eq 1102 -and $_.logname -eq "Security")} | format-list *
 
 #$AllSysmonEvents | where-object -property id -eq 1 | gm
 
@@ -289,6 +302,20 @@ function Get-SummaryAnalysis {
 	"=========================================================================================="
 	$AllEvents | Group-Object -Property MachineName | format-table @{Label="MachineName"; Expression={$_.Name}},Count
 }
+
+function Get-AdditionalAnalysis{
+	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	"======================== Critical Windows Events Analysis ==================="
+	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+	"`nScript Run Time: $TimeRun"
+	"`n`n"
+	"`n=========================================================================================="
+	"Security Event ID 1102 or System Event ID 104 (logs cleared)"
+	"=========================================================================================="
+	$AllEvents | where-object {($_.id -eq 104 -and $_.logname -eq "System") -or ($_.id -eq 1102 -and $_.logname -eq "Security")} | format-list @{Label="------"; Expression={" "}},TimeCreated,LogName,ID,Subject_Account_Name,Subject_Domain_Name,Subject_Logon_ID,UserID,Properties
+	
+}
+
 function Get-LogonAnalysis{
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"======================== Critical Windows Events Logon Events Analysis ==================="
@@ -305,7 +332,7 @@ function Get-LogonAnalysis{
 	"Number of Event ID 4624, Logon Type 3 Events by Auth Package, New Logon Account 
 	Name, and New Logon Account Domain (Possible Successful Pass-The-Hash Indicator):"
 	"=========================================================================================="
-	$AllSecurityEvents | where-object { $_.id -eq 4624 -and $_.Logon_Information_Logon_Type -eq 3 -and $_.Detailed_Authentication_Information_Authentication_Package -eq "NTLM" -and $_.New_Logon_Account_Name -ne "ANONYMOUS LOGON" -and $_.New_Logon_Account_Domain -ne ((get-wmiobject Win32_ComputerSystem).Domain) } | group-object -property Detailed_Authentication_Information_Authentication_Package,New_Logon_Account_Name,New_Logon_Account_Domain | sort-object -Property count -Descending| format-table Count,@{Label="Authentication_Package"; Expression={($_.Name -split ",")[0]}},@{Label="New_Logon_Account_Name"; Expression={($_.Name -split ",")[1]}},@{Label="New_Logon_Account_Domain"; Expression={($_.Name -split ",")[2]}} -wrap
+	$AllSecurityEvents | where-object { $_.id -eq 4624 -and $_.Logon_Information_Logon_Type -eq 3 -and $_.Detailed_Authentication_Information_Authentication_Package -eq "NTLM" -and $_.New_Logon_Account_Name -ne "ANONYMOUS_LOGON" -and $_.New_Logon_Account_Domain -ne ((get-wmiobject Win32_ComputerSystem).Domain) } | group-object -property Detailed_Authentication_Information_Authentication_Package,New_Logon_Account_Name,New_Logon_Account_Domain | sort-object -Property count -Descending| format-table Count,@{Label="Authentication_Package"; Expression={($_.Name -split ",")[0]}},@{Label="New_Logon_Account_Name"; Expression={($_.Name -split ",")[1]}},@{Label="New_Logon_Account_Domain"; Expression={($_.Name -split ",")[2]}} -wrap
 
 	"`n=========================================================================================="
 	"Number of Event ID 4625, Logon Type 3 Events by Auth Package, New Logon Account 
@@ -330,6 +357,7 @@ function Get-LogonAnalysis{
 	"=========================================================================================="	
 	$AllSecurityEvents | where-object {$_.id -eq 4634 -and $_.Logon_Information_Logon_Type -eq 10 } | group-object -property Subject_Account_Name, Subject_Logon_ID | sort-object -property count -Descending | format-table Count,@{Label="New_Logon_Account_Name"; Expression={($_.Name -split ",")[0]}},@{Label="New_Logon_Logon_ID"; Expression={($_.Name -split ",")[1]}} -wrap
 }
+
 function Get-SysmonAnalysis{
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"======================== Critical Windows Events Sysmon Analysis ==================="
@@ -358,10 +386,10 @@ function Get-SysmonAnalysis{
 		
 	"`n=========================================================================================="
 	"Sysmon Event ID 1 (Process Create) Events where the Parent Commandline contains winword.exe, "
-	"excel.exe, powerpoint.exe, mspub.exe, outlook.exe, visio.exe, or powershell.exe and the created "
+	"excel.exe, powerpoint.exe, mspub.exe, outlook.exe, visio.exe, etc. and the created "
 	"process commandline contains jsc.exe, csc.exe, cmd.exe, powershell.exe, or msbuild.exe"
 	"=========================================================================================="
-	$AllSysmonEvents | where-object {$_.id -eq 1 } | Check-ParentChild | format-list Message_ParentCommandLine,Message_CommandLine
+	$AllSysmonEvents | where-object {$_.id -eq 1 } | Check-ParentChild | format-list Message_ParentProcessID,Message_ParentCommandLine,Message_ProcessID,Message_CommandLine
 
 }
 
@@ -372,9 +400,9 @@ function Find-Suspiciouswords{
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"`n Script Run Time: $TimeRun"
 	if ($SuspiciousWordsFile){
-		$SuspiciouswordsRegex = Get-RegexFromWords -file $SuspicousWordsFile
+		$SuspiciouswordsRegex = Get-RegexFromWords -file $SuspiciousWordsFile -Separator '|'
 	} else {
-		[regex]$SuspiciouswordsRegex = "whoami|ping|dsquery|dsget|tasklist|quser|cacls|wsmprovhost|psexec|msbuild|jsc|csc"
+		[regex]$SuspiciouswordsRegex = '.^'
 	}
 	
 	"#### Looking for these Suspicious words: " 
@@ -382,14 +410,16 @@ function Find-Suspiciouswords{
 	"######################################################"
 
 	Foreach ($Event in $AllEvents) {
-		if (($Event.Message).toLower() -match $SuspiciouswordsRegex) {
-			"`n---------------------------------------------------------------------------------------------------"
-			"######################################################"
-			"#### Matched words:"
-			"#### "+ $Matches.values
-			"######################################################"
-			"`nEvent Details:"
-			$Event
+		if ($Event.Message) {
+			if ( ($Event.Message).toLower() -match $SuspiciouswordsRegex) {
+				"`n---------------------------------------------------------------------------------------------------"
+				"######################################################"
+				"#### Matched words:"
+				"#### "+ $Matches.values
+				"######################################################"
+				"`nEvent Details:"
+				$Event
+			}
 		}
 	}
 }
@@ -399,10 +429,46 @@ function Get-Commandlines {
 	"================================ Sysmon Process Create Commandlines ==============================="
 	"+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
 	"`n Script Run Time: $TimeRun"
-	"---------------------------------------------------------------------------------------------------"
-	"-- All Command Lines recorded by Sysmon Event 1 (Process Create Events), grouped by image" 
+	
+	if ($CmdLineWhitelistFile ) {
+		$CmdLineWhitelist = Get-RegexFromWords -file $CmdLineWhitelistFile -Separator "|"
+	} else {
+		$CmdLineWhitelist = '.^'
+	}
+
+	
+	
+	"`n`n---------------------------------------------------------------------------------------------------"
+	"-- All Command Lines recorded by Sysmon Event 1 by length in groups of 100, excludes Command Line whitelist "
+	"file entries"
+	"---------------------------------------------------------------------------------------------------" 	
+	$AllID1 = $AllSysmonEvents | where-object {$_.id -eq 1 -and $_.Message_CommandLine -ne $null } 
+	
+	#$AllID1 | where-object {$_.Message_CommandLine -notmatch $CmdLineWhitelist } | group-object -property Message_CommandLine | sort-object {($_.Name).length} -Descending | format-table @{Label="CommandLine Length"; Expression={($_.Name).length}},count
+	
+	$AllID1 | where-object {$_.Message_CommandLine -notmatch $CmdLineWhitelist } | group-object -property {[Int][Math]::Floor($_.Message_CommandLine.length / 100)} |sort-object -property name | ft @{Label="Start"; Expression={([int]$_.Name * 100)}},@{Label="End"; Expression={([int]$_.Name * 100 + 99)}},count 
+
+	
+	"`n`n---------------------------------------------------------------------------------------------------"
+	"-- All Command Lines recorded by Sysmon Event 1 that are longer than 1000 characters, excludes"
+	"   Command Line whitelist file entries"
 	"---------------------------------------------------------------------------------------------------" 
-	$AllSysmonEvents |where-object {$_.id -eq 1 -and $_.Message_CommandLine -ne $null } |sort-object -property Message_Image | format-list Message_Image,Message_User,Message_LogonID,Message_ParentCommandLine,Message_CommandLine -groupby Message_image 
+	Foreach ($Event in $AllID1) {
+		if (($Event.Message_CommandLine).length -gt 1000 -and $Event.Message_CommandLine -notmatch $CmdLineWhitelist ) {
+			$Event.ID
+			$Event.Message_CommandLine
+		}
+	}
+	
+	
+	"`n`n---------------------------------------------------------------------------------------------------"
+	"-- All Command Lines recorded by Sysmon Event 1 (Process Create Events), grouped by image" 
+	"---------------------------------------------------------------------------------------------------" 	
+	$AllID1 | sort-object -property Message_Image | format-list Message_Image,Message_User,Message_LogonID,Message_ParentCommandLine,Message_CommandLine -groupby Message_image 
+	
+	
+	
+	
 }
 
 function Get-FileHashes {
@@ -441,12 +507,14 @@ function Get-FileHashes {
 	$AllSysmonEvents | where-object -property id -eq 6 |sort-object -property @{Expression={($_.Message_ImageLoaded -split '\\')[-1]}},Message_Hashes -unique | format-list @{Label="Message_ImageLoaded"; Expression={($_.Message_ImageLoaded -split '\\')[-1]}},Message_ImageLoaded,@{Label="Message_Hash-SHA1"; Expression={($_.Message_Hashes -split ',')[0]}},@{Label="Message_Hash-MD5"; Expression={($_.Message_Hashes -split ',')[1]}}, @{Label="Message_Hash-SHA256"; Expression={($_.Message_Hashes -split ',')[2]}}
 }
  
-write-host "[] Writing Analysis output to $SummaryAnalysisOutputFile" -foregroundcolor cyan
+write-host "[] Writing Summary Analysis output to $SummaryAnalysisOutputFile" -foregroundcolor cyan
 Get-SummaryAnalysis | write-output | out-file $SummaryAnalysisOutputFile -encoding utf8
-write-host "[] Writing Analysis output to $LogonAnalysisOutputFile" -foregroundcolor cyan
+write-host "[] Writing Logon Analysis output to $LogonAnalysisOutputFile" -foregroundcolor cyan
 Get-LogonAnalysis | write-output | out-file $LogonAnalysisOutputFile -encoding utf8
-write-host "[] Writing Analysis output to $SysmonAnalysisOutputFile" -foregroundcolor cyan
+write-host "[] Writing Sysmon Analysis output to $SysmonAnalysisOutputFile" -foregroundcolor cyan
 Get-SysmonAnalysis | write-output | out-file $SysmonAnalysisOutputFile -encoding utf8
+write-host "[] Writing Additional Analysis output to $AdditionalAnalysisOutputFile" -foregroundcolor cyan
+Get-AdditionalAnalysis | write-output | out-file $AdditionalAnalysisOutputFile -encoding utf8
 write-host "[] Writing Suspicious Word Match output to $SuspiciousWordMatchOutputFile" -foregroundcolor cyan
 Find-Suspiciouswords | write-output | out-file $SuspiciousWordMatchOutputFile -encoding utf8
 write-host "[] Writing Sysmon Recorded File Hashes to $FileHashesOutputFile" -foregroundcolor cyan

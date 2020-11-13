@@ -367,11 +367,12 @@ if ($PSCmdlet.ParameterSetName -eq 'byLogFile') {
 	
 	# filterhashtable seems to have a max of 23 items for the ID values so need to loop
 	$start =0
-	$end = 20
+	$end = 19
 	
 	while ($end -lt $FileEventsIds.length){
 	
 		try {
+			#Get-Winevent -filterhashtable @{ Path=$EvtxFile; ID=$FileEventsIds[$start..$end]; } -ErrorAction stop | foreach-object {$_.toxml()}
 			$jsonEvents = Get-Winevent -filterhashtable @{ Path=$EvtxFile; ID=$FileEventsIds[$start..$end]; } -ErrorAction stop | foreach-object {$_ | convertto-json}
 			# join each object's json with a comma as a list/array of json objects and add to output string
 			$jsonOutput += [string]::join(",",$jsonEvents)
